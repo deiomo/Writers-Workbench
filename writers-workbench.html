@@ -473,12 +473,12 @@ pre#out .h{color:var(--accent)}
 
     <div class="roster" id="roster-scenario"></div>
 
-    <p class="lede">The setting block is always-on context: it exports as a lorebook entry with <em>constant</em> switched on, so it's injected every turn regardless of keywords. That means every line here costs tokens on every message — write for constraint, not for lore.</p>
+    <p class="lede">Put this in the scenario section in advanced definitions or description. </p>
 
     <details class="sec" open>
       <summary>Setting<span class="count" data-for="setting"></span><span class="tok" data-tok="setting"></span></summary>
       <div class="body">
-        <p class="hint">Where this takes place, at whatever scale matters — a building, a city, a country, a planet. Include the sensory texture: what it smells like, what you hear, what the light does. That's the part the model actually uses.</p>
+        <p class="hint">Where your story takes place, at whatever scale you choose. A building, a city, a country, a planet.</p>
         <div class="field"><label>Location</label><input data-k="location" placeholder="Kaldrenn Keep, northern border of the Union"></div>
         <div class="field"><label>Description</label><textarea data-k="setting" style="min-height:110px" placeholder="A garrison fortress repurposed as a prison. Stone sweats in winter. Everything smells of tallow and wet wool. Torches, not lamps."></textarea></div>
       </div>
@@ -487,7 +487,7 @@ pre#out .h{color:var(--accent)}
     <details class="sec" open>
       <summary>Level of technology<span class="count" data-for="tech"></span><span class="tok" data-tok="tech"></span></summary>
       <div class="body">
-        <p class="hint">A label is fine, but the useful part is the limits: can they contact someone at a distance, how fast can they travel, what can't they find out, what can't be fixed. Constraints generate scenes; labels don't.</p>
+        <p class="hint">A label is fine, but the useful part is the limits: can they contact someone at a distance, how fast can they travel, what can't they find out, what can't be fixed. Constraints generate scenes.</p>
         <div class="field"><label>Era / label</label><input data-k="techLabel" placeholder="Late medieval, early gunpowder"></div>
         <div class="field"><label>What it means in practice</label><textarea data-k="tech" placeholder="Messages travel by rider — days, not minutes. No anaesthetic beyond alcohol. A broken leg can end a life."></textarea></div>
       </div>
@@ -496,7 +496,7 @@ pre#out .h{color:var(--accent)}
     <details class="sec" open>
       <summary>Overall mood<span class="count" data-for="mood"></span><span class="tok" data-tok="mood"></span></summary>
       <div class="body">
-        <p class="hint">Keep this about the <em>setting's</em> atmosphere — weather, light, decay, tension in the air — rather than prose style. Prose tone is the preset's job; if this field and the preset disagree, they'll fight, and this one loses.</p>
+        <p class="hint">Keep this about the <em>setting's</em> atmosphere — weather, light, decay, tension in the air.</p>
         <div class="field"><textarea data-k="mood" placeholder="Grey, damp, waiting. Nobody raises their voice. Everyone is listening for boots on stone."></textarea></div>
       </div>
     </details>
@@ -523,7 +523,7 @@ pre#out .h{color:var(--accent)}
       <span class="lorebook-note">Exports as a SillyTavern World Info .json. Each location becomes one keyed entry — it's injected only when its trigger words appear in recent chat.</span>
     </div>
 
-    <p class="lede">Works at any scale — a room, a building, a field, a district. Every field is optional. Write for what a scene can <em>do</em> here, not what the place looks like in a brochure.</p>
+    <p class="lede">Works at any scale — a room, a building, a field, a district. Every field is optional. Write for what a scene can <em>do</em> here.</p>
 
     <details class="sec" open>
       <summary>Identity<span class="count" data-for="identity"></span><span class="tok" data-tok="identity"></span></summary>
@@ -533,14 +533,14 @@ pre#out .h{color:var(--accent)}
           <div class="field"><label>Part of</label><input data-k="partOf" placeholder="Harbor district. The Tenma house. (optional)"></div>
         </div>
         <div class="field"><label>Trigger words</label><input data-k="keys" placeholder="Comma-separated. Leave blank to key on the name." autocomplete="off"></div>
-        <p class="hint">Trigger words decide when this entry loads. A place called "the kitchen" keyed on its name will fire every time anyone mentions a kitchen — override with something specific.</p>
+        <p class="hint">Trigger words decide when this entry loads. A place called "the kitchen" keyed on its name will fire every time anyone mentions a kitchen. Use something specific.</p>
       </div>
     </details>
 
     <details class="sec" open>
       <summary>Overall vibe &amp; senses<span class="count" data-for="vibe"></span><span class="tok" data-tok="vibe"></span></summary>
       <div class="body">
-        <p class="hint">Smell, sound, light, temperature, what's underfoot. Sensory specifics are the highest-yield prose fuel per token in this whole tool. General mood belongs on the Scenario tab.</p>
+        <p class="hint">Smell, sound, light, temperature, what's underfoot; things specific to this location. General mood belongs on the Scenario tab.</p>
         <div class="field"><textarea data-k="vibe" placeholder="Low ceiling, tar and old beer. A stove that ticks as it cools. You can hear the harbor through the back wall."></textarea></div>
       </div>
     </details>
@@ -548,7 +548,7 @@ pre#out .h{color:var(--accent)}
     <details class="sec" open>
       <summary>Ways in and out / what's nearby<span class="count" data-for="access"></span><span class="tok" data-tok="access"></span></summary>
       <div class="body">
-        <p class="hint">Doors, gates, paths, windows, and what's on the other side of them. This is what stops the model from teleporting people or putting a scene in a room with no exit.</p>
+        <p class="hint">Doors, gates, paths, windows, and what's on the other side of them. Use this for consistency.</p>
         <div class="field"><textarea data-k="access" placeholder="Front door onto the quay. Back door into the alley behind the fish market. Trapdoor to the cellar, usually bolted from below."></textarea></div>
       </div>
     </details>
@@ -573,7 +573,7 @@ pre#out .h{color:var(--accent)}
     <details class="sec" open>
       <summary>Notable objects<span class="count" data-for="objects"></span><span class="tok" data-tok="objects"></span></summary>
       <div class="body">
-        <p class="hint">Things that can be used, taken, hidden behind, or broken. A heavy table is furniture; a heavy table you can flip is a scene.</p>
+        <p class="hint">Things that can be used, taken, hidden behind, or broken.</p>
         <div class="rows" data-list="objects"></div>
         <button class="add" data-add="objects">+ Add object</button>
       </div>
@@ -582,7 +582,7 @@ pre#out .h{color:var(--accent)}
     <details class="sec" open>
       <summary>Notable people<span class="count" data-for="people"></span><span class="tok" data-tok="people"></span></summary>
       <div class="body">
-        <p class="hint">Who owns it, works here, lives here. Name and a one-line role only — the full profile lives on the Side characters tab, and duplicating it here means two versions that drift apart.</p>
+        <p class="hint">Who owns the location, works here, lives here. Name and a one-line role only — the full profile lives on the characters tab.</p>
         <div class="rows" data-list="people"></div>
         <button class="add" data-add="people">+ Add person</button>
       </div>
@@ -591,7 +591,7 @@ pre#out .h{color:var(--accent)}
     <details class="sec" open>
       <summary>Rules and dangers<span class="count" data-for="rules"></span><span class="tok" data-tok="rules"></span></summary>
       <div class="body">
-        <p class="hint">What's off-limits, what's locked, what goes wrong, what gets you thrown out. The friction field.</p>
+        <p class="hint">What's off-limits, what's locked, what goes wrong, what gets you thrown out.</p>
         <div class="rows" data-list="rules"></div>
         <button class="add" data-add="rules">+ Add</button>
       </div>
@@ -600,7 +600,7 @@ pre#out .h{color:var(--accent)}
     <details class="sec" open>
       <summary>How it changes with time<span class="count" data-for="time"></span><span class="tok" data-tok="time"></span></summary>
       <div class="body">
-        <p class="hint">Day versus night, season, weather, tide. Cheap and high-yield, especially outdoors.</p>
+        <p class="hint">Day versus night, season, weather, tide. Good for outdoor locations.</p>
         <div class="field"><textarea data-k="time" placeholder="Shutters go up at dusk and the lamps come on. In winter the quay ices and nobody uses the front door."></textarea></div>
       </div>
     </details>
@@ -618,7 +618,7 @@ pre#out .h{color:var(--accent)}
       <span class="lorebook-note">Exports as a SillyTavern World Info .json. Each item becomes one keyed entry — injected only when its trigger words appear in recent chat.</span>
     </div>
 
-    <p class="lede">For items that matter to the story. A generic torch or coin purse is pure token cost — if nobody wants it and it has no limits, it doesn't need a card.</p>
+    <p class="lede">For items that matter to the story. A generic items, it doesn't need an entry.</p>
 
     <details class="sec" open>
       <summary>Identity<span class="count" data-for="identity"></span><span class="tok" data-tok="identity"></span></summary>
@@ -629,14 +629,14 @@ pre#out .h{color:var(--accent)}
           <div class="field"><label>Carried by</label><input data-k="carriedBy" placeholder="A person — Marla"></div>
         </div>
         <div class="field"><label>Trigger words</label><input data-k="keys" placeholder="Comma-separated. Leave blank to key on the name." autocomplete="off"></div>
-        <p class="hint">Items move. Kept at and Carried by are the model's only record of where this is right now — update them when it changes hands. Trigger words: "the knife" keyed on its name will fire on every knife in the story.</p>
+        <p class="hint"></p>
       </div>
     </details>
 
     <details class="sec" open>
       <summary>Appearance<span class="count" data-for="appearance"></span><span class="tok" data-tok="appearance"></span></summary>
       <div class="body">
-        <p class="hint">Weight, texture, temperature, sound, wear. Sensory over inventory — the detail the model will keep reaching for.</p>
+        <p class="hint">Weight, texture, temperature, sound, wear.</p>
         <div class="field"><textarea data-k="appearance" placeholder="Plain iron band, always slightly warm, too heavy for its size. The inside is worn smooth where it's been turned."></textarea></div>
       </div>
     </details>
@@ -660,7 +660,7 @@ pre#out .h{color:var(--accent)}
     <details class="sec" open>
       <summary>Limits &amp; costs<span class="count" data-for="limits"></span><span class="tok" data-tok="limits"></span></summary>
       <div class="body">
-        <p class="hint">The most important section. What it can't do, what it takes from you, how many uses. An item with no cost is a plot-solving button and the model will press it every scene.</p>
+        <p class="hint">What it can't do, what it takes from you, how many uses.</p>
         <div class="rows" data-list="limits"></div>
         <button class="add" data-add="limits">+ Add</button>
       </div>
@@ -706,7 +706,7 @@ pre#out .h{color:var(--accent)}
         </div>
         <div class="field"><label>Size &amp; reach</label><input data-k="reach" placeholder="Forty people, one city. Or: eight, but they own the docks."></div>
         <div class="field"><label>Trigger words</label><input data-k="keys" placeholder="Comma-separated. Leave blank to key on the name." autocomplete="off"></div>
-        <p class="hint">Size and reach calibrate how much weight the model gives them — without it, every group reads as either a street gang or a world power. Trigger words matter here: a faction called "the Guild" keyed on its name will fire constantly.</p>
+        <p class="hint">Size and reach calibrate how much weight the model gives them. Without it, every group reads as either a street gang or a world power.</p>
       </div>
     </details>
 
@@ -737,7 +737,7 @@ pre#out .h{color:var(--accent)}
     <details class="sec" open>
       <summary>Who's in it<span class="count" data-for="members"></span><span class="tok" data-tok="members"></span></summary>
       <div class="body">
-        <p class="hint">Leadership and notable members — name and one-line role. Full profiles live on the Side characters tab; duplicating them here gives you two versions that drift.</p>
+        <p class="hint">Leadership and notable members — name and one-line role. Full profiles live on the characters tab.</p>
         <div class="rows" data-list="members"></div>
         <button class="add" data-add="members">+ Add member</button>
       </div>
