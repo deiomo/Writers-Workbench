@@ -207,7 +207,7 @@ pre#out .h{color:var(--accent)}
       <label for="lorebookNameMain">Lorebook name</label>
       <input id="lorebookNameMain" placeholder="e.g. Glory Maximum — leads" autocomplete="off" spellcheck="false">
       <label class="toggle" style="margin-left:4px"><input type="checkbox" id="mainConstant"> Always on</label>
-      <span class="lorebook-note">Main cards normally belong in the character card's description field — the .md button. Use the lorebook export for characters who are mentioned but not always present, or for group chats. <strong>Always on</strong> makes every entry constant: injected every turn regardless of keywords, which for a full main card is expensive.</span>
+      <span class="lorebook-note">Main characters normally belong in the character card's description field. <strong>Always on</strong> makes every entry constant.</span>
     </div>
 
     <details class="sec" open>
@@ -255,7 +255,7 @@ pre#out .h{color:var(--accent)}
     <details class="sec">
       <summary>Body &amp; intimate details (NSFW)<span class="count" data-for="nsfwLook"></span><span class="tok" data-tok="nsfwLook"></span></summary>
       <div class="body">
-        <p class="hint">Optional, and for adult characters only. Fill what's relevant and leave the rest — empty fields don't reach the output. Same rule as the rest of the card: specific and sensory beats a measurement.</p>
+        <p class="hint">Optional. Fill what's relevant and leave the rest empty. Specific and sensory description recommended.</p>
         <div class="grid2">
           <div class="field"><label>Chest</label><input data-k="chest"></div>
           <div class="field"><label>Hips &amp; rear</label><input data-k="hips"></div>
@@ -323,7 +323,7 @@ pre#out .h{color:var(--accent)}
       <summary>Intimacy &amp; vulnerability<span class="count" data-for="intimacy"></span><span class="tok" data-tok="intimacy"></span></summary>
       <div class="body">
         <p class="hint">Which way they lean, what pulls them or drives them away. e.g. Core Dynamic: A rough dominatrix. Drawn To: Submissive men. Friction Points/hard boundary: She always wants consent, will stop when partner is actually hurt, but she really loves roughplay. Hates when asked to be gentle. </p>
-        <div class="field"><label>Core dynamic</label><textarea data-k="intimacy"></textarea></div>
+        <div class="field"><label>Core dynamic (An overall summary of what their sexuality)</label><textarea data-k="intimacy"></textarea></div>
         <div class="field"><label>Drawn to</label><textarea data-k="drawnTo"></textarea></div>
         <div class="field"><label>Friction points / hard boundary</label><textarea data-k="friction"></textarea></div>
         <div class="field" style="margin-top:14px"><label>Kinks &amp; turn-ons</label></div>
@@ -331,7 +331,7 @@ pre#out .h{color:var(--accent)}
         <div class="rows" data-list="kinks"></div>
         <button class="add" data-add="kinks">+ Add kink</button>
         <div class="field" style="margin-top:14px"><label>Turn-offs &amp; hard limits</label></div>
-        <p class="hint">What stops the scene. Worth filling even if the list is short — a character with no limits reads as a prop rather than a person.</p>
+        <p class="hint">What stops the scene. Worth filling even if the list is short. A character with no limits reads as a prop rather than a person.</p>
         <div class="rows" data-list="limitsNsfw"></div>
         <button class="add" data-add="limitsNsfw">+ Add limit</button>
       </div>
