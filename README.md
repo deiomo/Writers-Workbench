@@ -35,8 +35,11 @@ Concepts: magic systems, laws, customs, species, anything else
 # Changelog
 
 -A visual overhaul to add some "pizzaz"
+
 -Autosave: Your progressed is cached in your browser. You can close it and open it again, your progress will still be there. 
+
 -Reset all: Resets progress in all tabs for convenience
+
 -Example dialogue writing prompts to help you brainstorm dialogue for main and side characters
 13 prompts covering moods and situations: good mood, bad news, angered, small talk, bumped into by a stranger, complimented, asked to do something they don't want, caught in a lie, meeting someone new, someone they care about threatened, asked about their past, flirted with, under real pressure.   
 
@@ -53,8 +56,12 @@ Main characters
 -What they know / What they wrongly believe: same thing from from main characters.
 ## Scenario
 -Genre and Themes
+
 -Overarching story: a new section with three fields: what's going on, what it's driving toward, and what happens if nobody acts. 
+
 History
+
 -What people say happened: the public account under what really happened. NPCs can repeat the public, wrongful version while the narration knows better.
 ## Output format: every section is now an XML tag
+
 Each section of every entry now exports wrapped in its own tag, named after the entry and the section so the AI can recall information better.
