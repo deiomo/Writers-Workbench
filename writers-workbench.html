@@ -1,0 +1,3834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Writer's Workbench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#16191c; --panel:#1d2125; --panel-2:#23282d;
+  --line:#31373d; --line-soft:#282e33;
+  --ink:#e6e9ec; --ink-dim:#8d979f; --ink-faint:#5f6a72;
+  --accent:#5fb8b0; --name:#e0a253; --danger:#c76a5a; --warn:#d4a03c;
+  --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;font-size:inherit;cursor:pointer}
+input,textarea{font-family:inherit}
+
+.shell{display:flex;flex-direction:column;height:100vh}
+header{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{font-weight:600;letter-spacing:-0.01em;font-size:15px}
+.brand span{color:var(--ink-faint);font-weight:400}
+
+.tabs{display:flex;gap:2px;background:var(--bg);padding:3px;border-radius:5px;border:1px solid var(--line)}
+.tab{background:none;border:none;color:var(--ink-dim);padding:6px 14px;border-radius:3px;transition:background .12s,color .12s;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{background:var(--panel-2);color:var(--ink);font-weight:500}
+.tab:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+.namebar{display:flex;align-items:center;gap:10px;flex:1;min-width:240px;max-width:400px}
+.namebar label{color:var(--ink-dim);white-space:nowrap;font-size:13px}
+#charName{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:7px 10px;color:var(--name);font-family:var(--mono);font-weight:500;font-size:14px}
+#charName:focus{outline:none;border-color:var(--name);box-shadow:0 0 0 3px rgba(224,162,83,.13)}
+#charName::placeholder{color:var(--ink-faint);font-weight:400}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;align-items:center}
+#saveStatus{color:var(--ink-faint);font-size:12px;white-space:nowrap}
+.btn{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);padding:7px 13px;border-radius:4px;transition:background .12s,border-color .12s}
+.btn:hover{background:#2b3137;border-color:#3d444b}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#10201f;font-weight:600}
+.btn.primary:hover{background:#6ec9c0;border-color:#6ec9c0}
+.btn[hidden]{display:none}
+
+.split{display:flex;flex:1;min-height:0}
+.pane{overflow-y:auto;min-width:0}
+.form{flex:1 1 52%;padding:0 0 60px}
+.form[hidden]{display:none}
+.preview{flex:1 1 48%;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column}
+
+/* ---------- roster ---------- */
+.roster{
+  position:sticky;top:0;z-index:5;background:var(--panel);
+  border-bottom:1px solid var(--line);padding:10px 22px;
+  display:flex;gap:7px;flex-wrap:wrap;align-items:center;
+}
+.chip{
+  display:inline-flex;align-items:center;gap:0;background:var(--bg);
+  border:1px solid var(--line);border-radius:20px;overflow:hidden;
+}
+.chip.active{border-color:var(--name);background:rgba(224,162,83,.08)}
+.chip-name{
+  background:none;border:none;color:var(--ink-dim);padding:5px 4px 5px 13px;
+  max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.chip.active .chip-name{color:var(--name);font-weight:500}
+.chip-name:hover{color:var(--ink)}
+.chip-tok{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);padding:0 2px 0 0}
+.chip-x{background:none;border:none;color:var(--ink-faint);padding:5px 11px 5px 6px;line-height:1}
+.chip-x:hover{color:var(--danger)}
+.chip-name:focus-visible,.chip-x:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.roster-add{background:none;border:1px dashed var(--line);color:var(--ink-dim);padding:5px 13px;border-radius:20px}
+.roster-add:hover{border-color:var(--accent);color:var(--accent)}
+.roster-meta{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-faint);white-space:nowrap}
+
+.lede{padding:12px 22px;color:var(--ink-faint);font-size:12.5px;border-bottom:1px solid var(--line-soft);line-height:1.5}
+
+.sec{border-bottom:1px solid var(--line-soft)}
+.sec > summary{list-style:none;cursor:pointer;padding:12px 22px;display:flex;align-items:center;gap:10px;font-weight:500;color:var(--ink);user-select:none}
+.sec > summary::-webkit-details-marker{display:none}
+.sec > summary:hover{background:var(--panel-2)}
+.sec > summary::before{content:"";width:0;height:0;border-left:5px solid var(--ink-faint);border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s;flex:none}
+.sec[open] > summary::before{transform:rotate(90deg)}
+.count{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+.count.filled{color:var(--accent)}
+.tok{font-family:var(--mono);font-size:11px;color:var(--ink-faint);min-width:42px;text-align:right}
+.tok.heavy{color:var(--warn)}
+.body{padding:4px 22px 20px}
+
+.field{margin-bottom:12px}
+.field label{display:block;color:var(--ink-dim);font-size:12px;margin-bottom:4px}
+.field input,.field textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:8px 10px;color:var(--ink);font-size:14px;resize:vertical}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(95,184,176,.12)}
+.field input::placeholder,.field textarea::placeholder{color:var(--ink-faint)}
+.field textarea{min-height:76px;line-height:1.55}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hint{color:var(--ink-faint);font-size:12px;margin:-4px 0 12px;line-height:1.45}
+
+.rows{display:flex;flex-direction:column;gap:7px;margin-bottom:9px}
+.row{display:flex;gap:7px;align-items:flex-start}
+.row .bullet{color:var(--ink-faint);font-family:var(--mono);padding-top:8px;flex:none;width:12px;text-align:center}
+.row input,.row textarea{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:8px 10px;color:var(--ink);font-size:14px;resize:vertical}
+.row input:focus,.row textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(95,184,176,.12)}
+.row input::placeholder,.row textarea::placeholder{color:var(--ink-faint)}
+.x{background:none;border:1px solid transparent;color:var(--ink-faint);padding:6px 9px;border-radius:4px;line-height:1;flex:none}
+.x:hover{color:var(--danger);border-color:var(--line)}
+.add{background:none;border:1px dashed var(--line);color:var(--ink-dim);padding:7px 12px;border-radius:4px}
+.add:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ---------- credits ---------- */
+.credits{flex:1;padding:0}
+.credits[hidden]{display:none}
+.field-note{color:var(--ink-faint);font-size:12.5px;line-height:1.5;padding:10px 22px;margin:0;border-bottom:1px solid var(--line-soft)}
+.credits-inner{max-width:62ch;padding:36px 28px 70px}
+.credits h1{font-size:22px;font-weight:600;letter-spacing:-0.015em;margin:0 0 28px}
+.cr{margin-bottom:26px}
+.cr h2{font-size:13px;font-weight:600;color:var(--accent);margin:0 0 8px}
+.cr p{margin:0 0 9px;color:var(--ink-dim);line-height:1.62}
+.cr p strong{color:var(--ink);font-weight:500}
+.cr a{color:var(--name);text-decoration:none;border-bottom:1px solid rgba(224,162,83,.35)}
+.cr a:hover{border-bottom-color:var(--name)}
+.cr a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cr ul{margin:0;padding-left:18px;color:var(--ink-dim);line-height:1.62}
+.cr li{margin-bottom:6px}
+.cr li strong{color:var(--ink);font-weight:500}
+.guide-inner{max-width:68ch}
+.g-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px}
+.guide h1{margin-bottom:12px}
+.g-intro{color:var(--ink-dim);margin:0 0 14px;line-height:1.6}
+.g-disclaimer{color:var(--ink-faint);font-size:12.5px;line-height:1.55;border-left:2px solid var(--line);padding-left:12px;margin:0 0 34px}
+.g-part{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:38px 0 16px;padding-top:18px;border-top:1px solid var(--line-soft)}
+.g{display:grid;grid-template-columns:38px 1fr;gap:0 14px;margin-bottom:26px}
+.g-num{font-family:var(--mono);font-size:13px;color:var(--name);padding-top:2px}
+.g-body h3{font-size:14.5px;font-weight:600;margin:0 0 7px;color:var(--ink)}
+.g-body p{margin:0 0 8px;color:var(--ink-dim);line-height:1.62}
+.g-body code{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--bg);padding:1px 5px;border-radius:3px}
+.g-rule{color:var(--ink);border-left:2px solid var(--accent);padding-left:10px}
+.g-ex{font-family:var(--mono);font-size:12.5px;line-height:1.6;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:10px 12px;margin:6px 0 10px;white-space:pre-wrap}
+@media (max-width:600px){.g{grid-template-columns:30px 1fr;gap:0 10px}}
+.hint-list{margin:-6px 0 12px;padding-left:16px;list-style:disc}
+.hint-list li{margin-bottom:3px;line-height:1.5}
+.hint-list strong{color:var(--ink-dim);font-weight:500}
+.cr-foot{color:var(--ink-faint);font-size:12.5px;border-top:1px solid var(--line-soft);padding-top:18px;margin:34px 0 0;line-height:1.55}
+.lorebook-bar{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 22px;border-bottom:1px solid var(--line-soft);background:var(--panel);
+}
+.lorebook-bar label{color:var(--ink-dim);font-size:12.5px;white-space:nowrap}
+.lorebook-bar input{
+  flex:1;min-width:200px;max-width:360px;background:var(--bg);border:1px solid var(--line);
+  border-radius:4px;padding:6px 10px;color:var(--ink);font-size:13.5px;
+}
+.lorebook-bar input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(95,184,176,.12)}
+.lorebook-bar input::placeholder{color:var(--ink-faint)}
+.lorebook-note{color:var(--ink-faint);font-size:12px;flex-basis:100%;line-height:1.45}
+.namebar[hidden],.toolbar[hidden],.preview[hidden],.roster[hidden]{display:none}
+
+.pv-head{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);flex:none;flex-wrap:wrap}
+.pv-title{color:var(--ink-dim);font-size:13px}
+#totalTok{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);border:1px solid var(--line);border-radius:20px;padding:2px 10px}
+#totalTok.heavy{color:var(--warn);border-color:rgba(212,160,60,.4)}
+.toggle{display:flex;align-items:center;gap:7px;color:var(--ink-dim);font-size:12.5px;cursor:pointer;user-select:none}
+.toggle input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+.pv-actions{margin-left:auto;display:flex;gap:8px}
+pre#out{margin:0;padding:20px;flex:1;overflow:auto;font-family:var(--mono);font-size:12.5px;line-height:1.65;color:#c9d1d6;white-space:pre-wrap;word-break:break-word}
+pre#out .n{color:var(--name);font-weight:500}
+pre#out .h{color:var(--accent)}
+
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel-2);border:1px solid var(--line);color:var(--ink);padding:10px 18px;border-radius:5px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;font-size:13px;z-index:50}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (max-width:900px){
+  .split{flex-direction:column}
+  .preview{border-left:none;border-top:1px solid var(--line);min-height:44vh}
+  .form{flex:none}
+  .grid2{grid-template-columns:1fr}
+  header{padding:12px 16px;gap:12px}
+  .body,.sec>summary,.lede,.roster{padding-left:16px;padding-right:16px}
+  .toolbar{width:100%;margin-left:0}
+  .roster-meta{margin-left:0;width:100%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<header>
+  <div class="brand">Writer's Workbench <span>/ SillyTavern</span></div>
+  <div class="tabs" role="tablist" aria-label="Card type">
+    <button class="tab" role="tab" id="tab-main" aria-selected="true" data-mode="main">Main characters</button>
+    <button class="tab" role="tab" id="tab-side" aria-selected="false" data-mode="side">Side characters</button>
+    <button class="tab" role="tab" id="tab-scenario" aria-selected="false" data-mode="scenario">Scenario</button>
+    <button class="tab" role="tab" id="tab-location" aria-selected="false" data-mode="location">Locations</button>
+    <button class="tab" role="tab" id="tab-item" aria-selected="false" data-mode="item">Items</button>
+    <button class="tab" role="tab" id="tab-faction" aria-selected="false" data-mode="faction">Factions</button>
+    <button class="tab" role="tab" id="tab-history" aria-selected="false" data-mode="history">History</button>
+    <button class="tab" role="tab" id="tab-concept" aria-selected="false" data-mode="concept">Concepts</button>
+    <button class="tab" role="tab" id="tab-guide" aria-selected="false" data-mode="guide">Guide</button>
+    <button class="tab" role="tab" id="tab-credits" aria-selected="false" data-mode="credits">Credits</button>
+  </div>
+  <div class="namebar">
+    <label for="charName">Name</label>
+    <input id="charName" placeholder="type once…" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="toolbar">
+    <button class="btn" id="btnSave">Save .json</button>
+    <button class="btn" id="btnLoad">Load .json</button>
+    <button class="btn" id="btnClear">Clear card</button>
+    <button class="btn" id="btnWipe">Reset all</button>
+    <span id="saveStatus"></span>
+    <input type="file" id="fileIn" accept=".json,application/json" hidden>
+  </div>
+</header>
+
+<div class="split">
+
+  <!-- ============ MAIN CHARACTER ============ -->
+  <div class="pane form" id="form-main" role="tabpanel" aria-labelledby="tab-main">
+
+    <div class="roster" id="roster-main"></div>
+
+    <p class="lede ww-disclaimer">You don't have to fill out every field. Only fill the ones you want the AI to pay attention to.</p>
+
+
+    <div class="lorebook-bar">
+      <label for="lorebookNameMain">Lorebook name</label>
+      <input id="lorebookNameMain" placeholder="e.g. Glory Maximum — leads" autocomplete="off" spellcheck="false">
+      <label class="toggle" style="margin-left:4px"><input type="checkbox" id="mainConstant"> Always on</label>
+      <span class="lorebook-note">Main characters normally belong in the character card's description field. <strong>Always on</strong> makes every entry constant.</span>
+    </div>
+
+    <details class="sec" open>
+      <summary>Identity<span class="count" data-for="identity"></span><span class="tok" data-tok="identity"></span></summary>
+      <div class="body">
+        <p class="hint">The basics. Goal here is the public one, what they're openly working toward. The private version goes in Personal goal further down. When the two differ, that gap creates tension.</p>
+        <div class="field"><label>Full name</label><input data-k="fullName" placeholder="Their complete legal name, if it differs from what they go by."></div>
+        <div class="field"><label>Aliases</label><input data-k="aliases" placeholder="Comma-separated. Nicknames, titles, false names, what enemies call them."></div>
+        <div class="grid2">
+          <div class="field"><label>Age</label><input data-k="age"></div>
+          <div class="field"><label>Race</label><input data-k="race"></div>
+          <div class="field"><label>Species</label><input data-k="species"></div>
+          <div class="field"><label>Sexual orientation</label><input data-k="orientation"></div>
+          <div class="field"><label>Occupation</label><input data-k="occupation"></div>
+          <div class="field"><label>Goal</label><input data-k="goal"></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Current status<span class="count" data-for="status"></span><span class="tok" data-tok="status"></span></summary>
+      <div class="body">
+        <p class="hint">Where they are right now and how they feel about it. Update this when the story moves.</p>
+        <div class="field"><label>Where they are now</label><textarea data-k="statusWhere" placeholder="Living in the back room of the clinic. Kuro is away on a job for the first time in years."></textarea></div>
+        <div class="field"><label>How they feel about it</label><textarea data-k="statusFeel" placeholder="Restless. Pretends the quiet is fine. Reorganises the same shelf every night."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Appearance &amp; vibe<span class="count" data-for="appearance"></span><span class="tok" data-tok="appearance"></span></summary>
+      <div class="body">
+        <p class="hint">Be specific but also feel free to embellish things in natural language. Vague terms and exact ones both work, and mixing them is fine.</p>
+        <ul class="hint hint-list">
+          <li><strong>Height</strong> — tall, short, towering, half a head shorter than {{user}}, 6'0", 174 cm</li>
+          <li><strong>Skin</strong> — white like snow, rough like scales, sun-darkened, freckled, ashen, olive, deep brown</li>
+          <li><strong>Eyes</strong> — small dead eyes, big innocent grey eyes, tired, sharp, heavy-lidded, brown</li>
+          <li><strong>Hair</strong> — messy, cropped short, greasy, waist-length, dark brown like chocolate, greying at the temples</li>
+          <li><strong>Face</strong> — sharp, pudgy, froggy, mature, withered, boyish, broad-jawed, scarred across one cheek</li>
+          <li><strong>Body type</strong> — wiry, soft, broad, stocky, gangly, built like a docker, thin at the wrists</li>
+          <li><strong>Usual clothes</strong> — loose fitting shirts, practical robes with long sleeves, whatever was on the floor, always immaculate</li>
+        </ul>
+        <div class="grid2">
+          <div class="field"><label>Height</label><input data-k="height"></div>
+          <div class="field"><label>Skin</label><input data-k="skin"></div>
+          <div class="field"><label>Eyes</label><input data-k="eyes"></div>
+          <div class="field"><label>Hair</label><input data-k="hair"></div>
+          <div class="field"><label>Face</label><input data-k="face" placeholder="Sharp, pudgy, froggy, mature, withered"></div>
+          <div class="field"><label>Body type</label><input data-k="body"></div>
+          <div class="field"><label>Usual clothes</label><input data-k="clothes"></div>
+        </div>
+        <div class="field"><label>Overall vibe</label><textarea data-k="vibe" placeholder="What people think about them at first glance."></textarea></div>
+
+        <label class="toggle" style="margin:10px 0 0"><input type="checkbox" data-k="useAnthro" data-bool="1"> Non-human features</label>
+        <div id="anthroRows" hidden>
+          <p class="hint">For anthro, beast, scaled, feathered, demonic, or anything else off the human template. Species goes in Identity at the top. Fill what applies and leave the rest.</p>
+          <ul class="hint hint-list">
+            <li><strong>Coat</strong> — short grey fur, coarse and shedding, dark scales with a green sheen, sleek feathers, patchy, white socks on all four paws</li>
+            <li><strong>Ears</strong> — tall and mobile, tufted, one notched from a fight, pinned back when nervous, floppy</li>
+            <li><strong>Tail</strong> — long and expressive, bottle-brush when startled, stubby, prehensile, drags when tired</li>
+            <li><strong>Muzzle &amp; teeth</strong> — short muzzle, blunt teeth, long snout, visible canines, beak</li>
+            <li><strong>Hands &amp; feet</strong> — pawpads, retractable claws, four fingers, hooves, talons, blunt human hands with fur to the wrist</li>
+            <li><strong>Other features</strong> — curled horns, folded wings, spines down the back, bioluminescent markings, a second pair of eyes</li>
+            <li><strong>Build &amp; stance</strong> — digitigrade, plantigrade, taur, hunched, a head taller than most humans, small enough to be picked up</li>
+          </ul>
+          <div class="grid2">
+            <div class="field"><label>Coat, scales, or feathers</label><input data-k="coat"></div>
+            <div class="field"><label>Ears</label><input data-k="ears"></div>
+            <div class="field"><label>Tail</label><input data-k="tail"></div>
+            <div class="field"><label>Muzzle &amp; teeth</label><input data-k="muzzle"></div>
+            <div class="field"><label>Hands &amp; feet</label><input data-k="pawsHands"></div>
+            <div class="field"><label>Build &amp; stance</label><input data-k="stance"></div>
+          </div>
+          <div class="field"><label>Other features</label><textarea data-k="anthroOther" placeholder="Horns, wings, spines, markings, anything else."></textarea></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Body &amp; intimate details (NSFW)<span class="count" data-for="nsfwLook"></span><span class="tok" data-tok="nsfwLook"></span></summary>
+      <div class="body">
+        <p class="hint">Optional. Fill what's relevant and leave the rest empty. Specific and sensory description recommended.</p>
+        <div class="grid2">
+          <div class="field"><label>Chest</label><input data-k="chest"></div>
+          <div class="field"><label>Hips &amp; rear</label><input data-k="hips"></div>
+          <div class="field"><label>Genitals</label><input data-k="genitals"></div>
+          <div class="field"><label>Body &amp; pubic hair</label><input data-k="bodyHair"></div>
+        </div>
+        <div class="field"><label>Usual underwear</label><textarea data-k="underwear" placeholder="What they default to. Practical and worn soft, or chosen with someone in mind."></textarea></div>
+        <div class="field"><label>Marks, scars, piercings, tattoos</label><textarea data-k="marks" placeholder="What's normally covered — and what a partner would notice first."></textarea></div>
+        <div class="field"><label>Scent &amp; skin</label><textarea data-k="scent" placeholder="How they smell, how warm they run, how their skin feels."></textarea></div>
+        <div class="field"><label>Anything else</label><textarea data-k="nsfwOther"></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Presence &amp; body language<span class="count" data-for="presence"></span><span class="tok" data-tok="presence"></span></summary>
+      <div class="body">
+        <p class="hint">How they carry themselves. Posture, how they move, what their hands do, how they take up space. Used when the model writes an action beat.</p>
+        <div class="field"><textarea data-k="presence" placeholder="Cat-like economy of movement. Ends up curled in the warmest corner without remembering walking there. Leans into a hand on the back of the neck before deciding to."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Backstory<span class="count" data-for="backstory"></span><span class="tok" data-tok="backstory"></span></summary>
+      <div class="body">
+        <p class="hint">Backstory should explain their currrent personality.</p>
+        <div class="field"><textarea data-k="backstory" style="min-height:120px" placeholder="Tell events that shaped their present behaviour."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Abilities &amp; skills &amp; weaknesses<span class="count" data-for="abilities"></span><span class="tok" data-tok="abilities"></span></summary>
+      <div class="body">
+        <p class="hint">What they can or can't do, and where it costs them or fails. Having a weakness creates interesting scenes.</p>
+        <div class="field"><label>Abilities &amp; skills</label><textarea data-k="abilities" placeholder="Healing magic, biology expert, martial arts trained with claws."></textarea></div>
+        <div class="field"><label>Weaknesses</label><textarea data-k="weaknesses" placeholder="Chronically ill as a child, still tires fast. Can't fight in enclosed spaces — panics."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Personality tags<span class="count" data-for="tags"></span><span class="tok" data-tok="tags"></span></summary>
+      <div class="body">
+        <p class="hint">Keep them distinct. If two tags describe the same behaviour, drop one. Tags summarize. The triggers below are what drive behaviour.</p>
+        <div class="rows" data-list="tags"></div>
+        <button class="add" data-add="tags">+ Add tag</button>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Psychology &amp; behavioral triggers<span class="count" data-for="triggers"></span><span class="tok" data-tok="triggers"></span></summary>
+      <div class="body">
+        <p class="hint">One trigger per row. Write as When X happens, they do Y. Give a condition and an observable behaviour. A trait like "hotheaded" or "shy" is a good start. Ask what behaviour and trigger actually makes them that way.</p>
+        <div class="rows" data-list="triggers"></div>
+        <button class="add" data-add="triggers">+ Add trigger</button>
+
+        <div class="field" style="margin-top:18px"><label>Core belief and emotional need</label></div>
+        <p class="hint">Optional. One sentence each. Together they explain why the triggers above fire, and what could change them.</p>
+        <div class="field"><label>Core belief: what assumption governs their choices?</label><textarea data-k="coreBelief" placeholder="Accepting help gives others control over them."></textarea></div>
+        <div class="field"><label>Protective strategy: what do they do because of that belief?</label><textarea data-k="protectiveStrategy" placeholder="Refuses assistance even when overwhelmed."></textarea></div>
+        <div class="field"><label>Emotional need: what would help them, even if they resist it?</label><textarea data-k="emotionalNeed" placeholder="Support without strings attached."></textarea></div>
+        <div class="field"><label>Conditions for change: what experience could challenge that belief?</label><textarea data-k="changeCondition" placeholder="Being helped by someone who then asks for nothing, and keeps asking for nothing."></textarea></div>
+
+        <div class="field" style="margin-top:18px"><label>What they know and what they get wrong</label></div>
+        <p class="hint">Optional. Gives the model a knowledge state to play. Everything exported is visible to the model, so this creates gaps between characters. The player can still see it.</p>
+        <div class="field"><label>What they know</label><textarea data-k="knows" placeholder="Knows Kuro took the contract. Knows the commander is lying about the relief column."></textarea></div>
+        <div class="field"><label>What they wrongly believe</label><textarea data-k="wrongBelief" placeholder="Believes Akane doesn't know about the relationship. She has known for years."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Core contradiction<span class="count" data-for="contradiction"></span><span class="tok" data-tok="contradiction"></span></summary>
+      <div class="body">
+        <p class="hint">Two things that are both true and pull against each other. Example: A healer that likes to fight. </p>
+        <div class="field"><textarea data-k="contradiction"></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Intimacy &amp; vulnerability<span class="count" data-for="intimacy"></span><span class="tok" data-tok="intimacy"></span></summary>
+      <div class="body">
+        <p class="hint">Which way they lean, what pulls them or drives them away. e.g. Core Dynamic: A rough dominatrix. Drawn To: Submissive men. Friction Points/hard boundary: She always wants consent, will stop when partner is actually hurt, but she really loves roughplay. Hates when asked to be gentle. </p>
+        <div class="field"><label>Core dynamic (An overall summary of what their sexuality)</label><textarea data-k="intimacy"></textarea></div>
+        <div class="field"><label>Drawn to</label><textarea data-k="drawnTo"></textarea></div>
+        <div class="field"><label>Friction points / hard boundary</label><textarea data-k="friction"></textarea></div>
+        <div class="field" style="margin-top:14px"><label>Kinks &amp; turn-ons</label></div>
+        <p class="hint">One per row. Add a reason if you can. "Being pinned, the relief of someone else deciding" works better than a bare label.</p>
+        <div class="rows" data-list="kinks"></div>
+        <button class="add" data-add="kinks">+ Add kink</button>
+        <div class="field" style="margin-top:14px"><label>Turn-offs &amp; hard limits</label></div>
+        <p class="hint">What stops the scene. Worth filling even if the list is short. A character with no limits reads as a prop.</p>
+        <div class="rows" data-list="limitsNsfw"></div>
+        <button class="add" data-add="limitsNsfw">+ Add limit</button>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Hobbies &amp; interests<span class="count" data-for="hobbies"></span><span class="tok" data-tok="hobbies"></span></summary>
+      <div class="body">
+        <p class="hint">What they do when no one needs anything from them. It gives them something to talk about.</p>
+        <div class="rows" data-list="hobbies"></div>
+        <button class="add" data-add="hobbies">+ Add hobby</button>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Likes, dislikes &amp; fears<span class="count" data-for="likes"></span><span class="tok" data-tok="likes"></span></summary>
+      <div class="body">
+        <p class="hint">Specific beats general. "Hates cold tea" works better than "dislikes bad food" because it can come up in a scene.</p>
+        <div class="field"><label>Likes</label></div>
+        <div class="rows" data-list="likes"></div>
+        <button class="add" data-add="likes">+ Add like</button>
+        <div class="field" style="margin-top:14px"><label>Dislikes</label></div>
+        <div class="rows" data-list="dislikes"></div>
+        <button class="add" data-add="dislikes">+ Add dislike</button>
+        <div class="field" style="margin-top:14px"><label>Fears</label></div>
+        <div class="rows" data-list="fears"></div>
+        <button class="add" data-add="fears">+ Add fear</button>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Quirks<span class="count" data-for="quirks"></span><span class="tok" data-tok="quirks"></span></summary>
+      <div class="body">
+        <p class="hint">The irrational behavior they do consistently and can't justify. e.g. Character flipping a stray coin on tails to heads and leaving it instead of pocketing it.</p>
+        <div class="field"><textarea data-k="quirks"></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Personal goal<span class="count" data-for="personalGoal"></span><span class="tok" data-tok="personalGoal"></span></summary>
+      <div class="body">
+        <p class="hint">The private want. The thing they'd only admit to one person, or to no one. If it matches the public Goal at the top, you only need one of them.</p>
+        <div class="field"><textarea data-k="personalGoal"></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Relationships<span class="count" data-for="relationships"></span><span class="tok" data-tok="relationships"></span></summary>
+      <div class="body">
+        <p class="hint">Format: who they are, then what the dynamic is.</p>
+        <div class="rows" data-list="relationships"></div>
+        <button class="add" data-add="relationships">+ Add relationship</button>
+      </div>
+    </details>
+
+    <details class="sec">
+      <summary>Voice &amp; example dialogue<span class="count" data-for="voice"></span><span class="tok" data-tok="voice"></span></summary>
+      <div class="body">
+        <p class="hint">Tone in a few words, then three to five lines showing the voice in different moods. Flustered, angry, relaxed, lying. Example dialogue works better than describing the voice. Lines don't have to be pure speech. Action and prose work too, and often show more than a quote does.</p>
+        <div class="field"><label>Tone</label><input data-k="tone"></div>
+        <label class="toggle" style="margin:2px 0 12px"><input type="checkbox" data-k="usePrompts" data-bool="1"> Use writing prompts</label>
+        <p class="hint" id="promptHint-main" hidden>Answer whichever fit. Blank ones are skipped. Write speech, action, or a mix. Turning this off hides these from the output without deleting them.</p>
+        <div id="promptRows-main" hidden></div>
+        <div class="field" style="margin-top:4px"><label>Other lines</label></div>
+        <div class="rows" data-list="dialogue"></div>
+        <button class="add" data-add="dialogue">+ Add line</button>
+      </div>
+    </details>
+
+  </div>
+
+  <!-- ============ SIDE CHARACTERS ============ -->
+  <div class="pane form" id="form-side" role="tabpanel" aria-labelledby="tab-side" hidden>
+
+    <div class="roster" id="roster-side"></div>
+
+
+    <div class="lorebook-bar">
+      <label for="lorebookName">Lorebook name</label>
+      <input id="lorebookName" placeholder="e.g. Glory Maximum — cast" autocomplete="off" spellcheck="false">
+      <span class="lorebook-note">Exports as a SillyTavern World Info .json. Each character becomes one entry, keyed on their name.</span>
+    </div>
+
+    <p class="lede">Side characters need one reason to be in the scene, one thing they want, and a distinct voice. Everything here is optional. A good side card can be six lines.</p>
+    <p class="lede ww-disclaimer">You don't have to fill out every field. Only fill the ones you want the AI to pay attention to.</p>
+
+    <details class="sec" open>
+      <summary>Identity<span class="count" data-for="identity"></span><span class="tok" data-tok="identity"></span></summary>
+      <div class="body">
+        <div class="field"><label>Full name</label><input data-k="fullName" placeholder="Their complete name, if it differs from what they go by."></div>
+        <div class="field"><label>Aliases</label><input data-k="aliases" placeholder="Comma-separated. Nicknames, titles, what regulars call them."></div>
+        <div class="grid2">
+          <div class="field"><label>Age</label><input data-k="age"></div>
+          <div class="field"><label>Race / species</label><input data-k="race"></div>
+        </div>
+        <div class="field"><label>Role</label><input data-k="role" placeholder="Squad medic. Shop owner. {{user}}'s landlord."></div>
+        <p class="hint">Aliases also become lorebook trigger words, so the entry fires on a nickname too.</p>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Current status<span class="count" data-for="status"></span><span class="tok" data-tok="status"></span></summary>
+      <div class="body">
+        <p class="hint">Where they are right now and how they feel about it. One line each is plenty.</p>
+        <div class="field"><label>Where they are now</label><textarea data-k="statusWhere" placeholder="Still running the forge. Business is slow."></textarea></div>
+        <div class="field"><label>How they feel about it</label><textarea data-k="statusFeel" placeholder="Bitter about it, blames the new road."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Look<span class="count" data-for="look"></span><span class="tok" data-tok="look"></span></summary>
+      <div class="body">
+        <p class="hint">One or two sentences. Pick the one detail someone would use to describe them.</p>
+        <div class="field"><textarea data-k="look" placeholder="Heavyset, permanent squint, forearms covered in old burn scars. Always has a toothpick."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Presence &amp; body language<span class="count" data-for="presence"></span><span class="tok" data-tok="presence"></span></summary>
+      <div class="body">
+        <p class="hint">How they move and hold themselves. One distinctive physical habit is enough.</p>
+        <div class="field"><textarea data-k="presence" placeholder="Leans on things. Never stands up straight unless someone's watching."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Function in the story<span class="count" data-for="function"></span><span class="tok" data-tok="function"></span></summary>
+      <div class="body">
+        <p class="hint">Why scenes include them. If you can't answer this, cut the character.</p>
+        <div class="field"><label>Why they show up</label><textarea data-k="function" placeholder="Runs the only forge in town. Everyone needs that forge eventually, and the owner knows it."></textarea></div>
+        <div class="field"><label>Connection to the main cast</label><textarea data-k="connection" placeholder="Trained {{user}} years ago. Still talks to them like they're sixteen."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Personality tags<span class="count" data-for="tags"></span><span class="tok" data-tok="tags"></span></summary>
+      <div class="body">
+        <p class="hint">Three is usually enough. Past five they stop being distinct.</p>
+        <div class="rows" data-list="tags"></div>
+        <button class="add" data-add="tags">+ Add tag</button>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Behavior<span class="count" data-for="triggers"></span><span class="tok" data-tok="triggers"></span></summary>
+      <div class="body">
+        <p class="hint">One or two triggers. Same format as a main card. Condition, then observable behaviour.</p>
+        <div class="rows" data-list="triggers"></div>
+        <button class="add" data-add="triggers">+ Add behavior</button>
+        <div class="grid2" style="margin-top:14px">
+          <div class="field"><label>What they know</label><textarea data-k="knows" placeholder="Knows who really owns the forge."></textarea></div>
+          <div class="field"><label>What they wrongly believe</label><textarea data-k="wrongBelief" placeholder="Thinks {{user}} is with the Union."></textarea></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>What they want<span class="count" data-for="want"></span><span class="tok" data-tok="want"></span></summary>
+      <div class="body">
+        <p class="hint">A want gives them something to push for, so scenes with them go somewhere.</p>
+        <div class="field"><textarea data-k="want" placeholder="Wants the debt paid. Will bring it up every single time, no matter what else is happening."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Quirk<span class="count" data-for="quirk"></span><span class="tok" data-tok="quirk"></span></summary>
+      <div class="body">
+        <p class="hint">One repeatable, specific habit makes a side character memorable. More useful than backstory.</p>
+        <div class="field"><textarea data-k="quirk" placeholder="Never finishes a sentence while lying — just trails off and changes the subject."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Voice &amp; example dialogue<span class="count" data-for="voice"></span><span class="tok" data-tok="voice"></span></summary>
+      <div class="body">
+        <div class="field"><label>Tone</label><input data-k="tone" placeholder="Clipped, impatient, swears constantly"></div>
+        <p class="hint">Two lines is enough to lock a voice. Speech, action, or a mix. Action often shows more than a quote does.</p>
+        <label class="toggle" style="margin:2px 0 12px"><input type="checkbox" data-k="usePrompts" data-bool="1"> Use writing prompts</label>
+        <p class="hint" id="promptHint-side" hidden>Answer whichever fit. Blank ones are skipped. Turning this off hides these from the output without deleting them.</p>
+        <div id="promptRows-side" hidden></div>
+        <div class="field" style="margin-top:4px"><label>Other lines</label></div>
+        <div class="rows" data-list="dialogue"></div>
+        <button class="add" data-add="dialogue">+ Add line</button>
+      </div>
+    </details>
+
+  </div>
+
+  <!-- ============ SCENARIO FORM ============ -->
+  <div class="pane form" id="form-scenario" role="tabpanel" aria-labelledby="tab-scenario" hidden>
+
+    <div class="roster" id="roster-scenario"></div>
+
+    <p class="lede">Put this in the scenario section in advanced definitions or description. </p>
+    <p class="lede ww-disclaimer">You don't have to fill out every field. Only fill the ones you want the AI to pay attention to.</p>
+
+    <details class="sec" open>
+      <summary>Setting<span class="count" data-for="setting"></span><span class="tok" data-tok="setting"></span></summary>
+      <div class="body">
+        <p class="hint">Where your story takes place, at whatever scale you choose. A building, a city, a country, a planet.</p>
+        <div class="field"><label>Location</label><input data-k="location" placeholder="Kaldrenn Keep, northern border of the Union"></div>
+        <div class="grid2">
+          <div class="field"><label>Genre</label><input data-k="genre" placeholder="Dark fantasy, noir, slice of life, sci-fi horror"></div>
+          <div class="field"><label>Themes</label><input data-k="themes" placeholder="Loyalty, decay, survival, class"></div>
+        </div>
+        <div class="field"><label>Description</label><textarea data-k="setting" style="min-height:110px" placeholder="A garrison fortress repurposed as a prison. Stone sweats in winter. Everything smells of tallow and wet wool. Torches on the walls."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Overarching story<span class="count" data-for="story"></span><span class="tok" data-tok="story"></span></summary>
+      <div class="body">
+        <p class="hint">The plot the scenario is built around. This block is always-on context, so keep it short. Give the shape of the story in a few lines.</p>
+        <div class="field"><label>What's going on</label><textarea data-k="story" style="min-height:100px" placeholder="The garrison hasn't been paid in four months. The commander is waiting on a relief column that isn't coming, and everyone below him has started to work that out."></textarea></div>
+        <div class="field"><label>What it's driving toward</label><textarea data-k="storyGoal" placeholder="Either someone takes the keep from the inside, or the winter does it for them."></textarea></div>
+        <div class="field"><label>What happens if nobody acts</label><textarea data-k="storyPressure" placeholder="Food runs out in three weeks. After that the garrison scatters and the border opens."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Level of technology<span class="count" data-for="tech"></span><span class="tok" data-tok="tech"></span></summary>
+      <div class="body">
+        <p class="hint">A label is fine, but the useful part is the limits: can they contact someone at a distance, how fast can they travel, what can't they find out, what can't be fixed. Constraints generate scenes.</p>
+        <div class="field"><label>Era / label</label><input data-k="techLabel" placeholder="Late medieval, early gunpowder"></div>
+        <div class="field"><label>What it means in practice</label><textarea data-k="tech" placeholder="Messages travel by rider and take days. No anaesthetic beyond alcohol. A broken leg can end a life."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Overall mood<span class="count" data-for="mood"></span><span class="tok" data-tok="mood"></span></summary>
+      <div class="body">
+        <p class="hint">Keep this about the <em>setting's</em> atmosphere — weather, light, decay, tension in the air.</p>
+        <div class="field"><textarea data-k="mood" placeholder="Grey, damp, waiting. Nobody raises their voice. Everyone is listening for boots on stone."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>What's normal here<span class="count" data-for="normal"></span><span class="tok" data-tok="normal"></span></summary>
+      <div class="body">
+        <p class="hint">The model needs to know what's normal here so it knows what stands out. Cover what people assume, what they take for granted, and what would get a stranger noticed.</p>
+        <div class="rows" data-list="normal"></div>
+        <button class="add" data-add="normal">+ Add</button>
+      </div>
+    </details>
+
+  </div>
+
+  <!-- ============ LOCATION FORM ============ -->
+  <div class="pane form" id="form-location" role="tabpanel" aria-labelledby="tab-location" hidden>
+
+    <div class="roster" id="roster-location"></div>
+
+    <div class="lorebook-bar">
+      <label for="lorebookNameLoc">Lorebook name</label>
+      <input id="lorebookNameLoc" placeholder="e.g. Kaldrenn Keep — places" autocomplete="off" spellcheck="false">
+      <span class="lorebook-note">Exports as a SillyTavern World Info .json. Each location becomes one keyed entry. Injected only when its trigger words appear in recent chat.</span>
+    </div>
+
+    <p class="lede">Works at any scale. A room, a building, a field, a district. Write for what a scene can do here.</p>
+    <p class="lede ww-disclaimer">You don't have to fill out every field. Only fill the ones you want the AI to pay attention to.</p>
+
+    <details class="sec" open>
+      <summary>Identity<span class="count" data-for="identity"></span><span class="tok" data-tok="identity"></span></summary>
+      <div class="body">
+        <div class="grid2">
+          <div class="field"><label>Type</label><input data-k="type" placeholder="Tavern, bedroom, training field, alley"></div>
+          <div class="field"><label>Part of</label><input data-k="partOf" placeholder="Harbor district. The Tenma house. (optional)"></div>
+        </div>
+        <div class="field"><label>Trigger words</label><input data-k="keys" placeholder="Comma-separated. Leave blank to key on the name." autocomplete="off"></div>
+        <p class="hint">Trigger words decide when this entry loads. A place called "the kitchen" keyed on its name will fire every time anyone mentions a kitchen. Use something specific.</p>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Overall vibe &amp; senses<span class="count" data-for="vibe"></span><span class="tok" data-tok="vibe"></span></summary>
+      <div class="body">
+        <p class="hint">Smell, sound, light, temperature, what's underfoot; things specific to this location. General mood belongs on the Scenario tab.</p>
+        <div class="field"><textarea data-k="vibe" placeholder="Low ceiling, tar and old beer. A stove that ticks as it cools. You can hear the harbor through the back wall."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Ways in and out / what's nearby<span class="count" data-for="access"></span><span class="tok" data-tok="access"></span></summary>
+      <div class="body">
+        <p class="hint">Doors, gates, paths, windows, and what's on the other side of them. Use this for consistency.</p>
+        <div class="field"><textarea data-k="access" placeholder="Front door onto the quay. Back door into the alley behind the fish market. Trapdoor to the cellar, usually bolted from below."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Who's usually here / how busy<span class="count" data-for="traffic"></span><span class="tok" data-tok="traffic"></span></summary>
+      <div class="body">
+        <p class="hint">Say who's around and when. This decides whether characters can talk freely, fight, or be alone.</p>
+        <div class="field"><textarea data-k="traffic" placeholder="Dead before noon. Packed with dockhands after the evening bell. Never truly empty — the owner sleeps upstairs."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>What you can do here<span class="count" data-for="actions"></span><span class="tok" data-tok="actions"></span></summary>
+      <div class="body">
+        <p class="hint">The location's function — what a scene comes here for.</p>
+        <div class="rows" data-list="actions"></div>
+        <button class="add" data-add="actions">+ Add</button>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Notable objects<span class="count" data-for="objects"></span><span class="tok" data-tok="objects"></span></summary>
+      <div class="body">
+        <p class="hint">Things that can be used, taken, hidden behind, or broken.</p>
+        <div class="rows" data-list="objects"></div>
+        <button class="add" data-add="objects">+ Add object</button>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Notable people<span class="count" data-for="people"></span><span class="tok" data-tok="people"></span></summary>
+      <div class="body">
+        <p class="hint">Who owns the location, works here, lives here. Name and a one-line role. The full profile lives on the characters tab.</p>
+        <div class="rows" data-list="people"></div>
+        <button class="add" data-add="people">+ Add person</button>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Rules and dangers<span class="count" data-for="rules"></span><span class="tok" data-tok="rules"></span></summary>
+      <div class="body">
+        <p class="hint">What's off-limits, what's locked, what goes wrong, what gets you thrown out.</p>
+        <div class="rows" data-list="rules"></div>
+        <button class="add" data-add="rules">+ Add</button>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>How it changes with time<span class="count" data-for="time"></span><span class="tok" data-tok="time"></span></summary>
+      <div class="body">
+        <p class="hint">Day versus night, season, weather, tide. Good for outdoor locations.</p>
+        <div class="field"><textarea data-k="time" placeholder="Shutters go up at dusk and the lamps come on. In winter the quay ices and nobody uses the front door."></textarea></div>
+      </div>
+    </details>
+
+  </div>
+
+  <!-- ============ ITEM FORM ============ -->
+  <div class="pane form" id="form-item" role="tabpanel" aria-labelledby="tab-item" hidden>
+
+    <div class="roster" id="roster-item"></div>
+
+    <div class="lorebook-bar">
+      <label for="lorebookNameItem">Lorebook name</label>
+      <input id="lorebookNameItem" placeholder="e.g. Kaldrenn Keep — items" autocomplete="off" spellcheck="false">
+      <span class="lorebook-note">Exports as a SillyTavern World Info .json. Each item becomes one keyed entry. Injected only when its trigger words appear in recent chat.</span>
+    </div>
+
+    <p class="lede">For items that matter to the story. Generic items doesn't need an entry.</p>
+    <p class="lede ww-disclaimer">You don't have to fill out every field. Only fill the ones you want the AI to pay attention to.</p>
+
+    <details class="sec" open>
+      <summary>Identity<span class="count" data-for="identity"></span><span class="tok" data-tok="identity"></span></summary>
+      <div class="body">
+        <div class="field"><label>Type</label><input data-k="type" placeholder="Ring, letter, rifle, key, vial"></div>
+        <div class="grid2">
+          <div class="field"><label>Kept at</label><input data-k="keptAt" placeholder="A location — The Rusty Anchor, cellar"></div>
+          <div class="field"><label>Carried by</label><input data-k="carriedBy" placeholder="A person — Marla"></div>
+        </div>
+        <div class="field"><label>Trigger words</label><input data-k="keys" placeholder="Comma-separated. Leave blank to key on the name." autocomplete="off"></div>
+        <p class="hint"></p>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Appearance<span class="count" data-for="appearance"></span><span class="tok" data-tok="appearance"></span></summary>
+      <div class="body">
+        <p class="hint">Weight, texture, temperature, sound, wear.</p>
+        <div class="field"><textarea data-k="appearance" placeholder="Plain iron band, always slightly warm, too heavy for its size. The inside is worn smooth where it's been turned."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>What it does<span class="count" data-for="function"></span><span class="tok" data-tok="function"></span></summary>
+      <div class="body">
+        <p class="hint">The effect or function, stated plainly.</p>
+        <div class="field"><textarea data-k="function" placeholder="Lets the wearer hear any conversation happening within the same building, one at a time."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>How it's used<span class="count" data-for="usage"></span><span class="tok" data-tok="usage"></span></summary>
+      <div class="body">
+        <p class="hint">The mechanics of using it. What it needs, how long it takes, what has to be done.</p>
+        <div class="field"><textarea data-k="usage" placeholder="Turn it three times on the finger while thinking of a name. Takes about a breath. Nothing happens if the person isn't in the building."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Limits &amp; costs<span class="count" data-for="limits"></span><span class="tok" data-tok="limits"></span></summary>
+      <div class="body">
+        <p class="hint">What it can't do, what it takes from you, how many uses.</p>
+        <div class="rows" data-list="limits"></div>
+        <button class="add" data-add="limits">+ Add</button>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Who wants it / why it matters<span class="count" data-for="stakes"></span><span class="tok" data-tok="stakes"></span></summary>
+      <div class="body">
+        <p class="hint">If nobody wants it, it's set dressing.</p>
+        <div class="field"><textarea data-k="stakes" placeholder="Marla stole it from the harbormaster. He knows it's in the building. He doesn't know who has it."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Current state<span class="count" data-for="state"></span><span class="tok" data-tok="state"></span></summary>
+      <div class="body">
+        <p class="hint">Intact, damaged, charged, empty, hidden, doses left. Update as the story moves.</p>
+        <div class="field"><textarea data-k="state" placeholder="Hidden in the cellar, wrapped in oilcloth inside an empty cask. Hairline crack on the inner band."></textarea></div>
+      </div>
+    </details>
+
+  </div>
+
+  <!-- ============ FACTION FORM ============ -->
+  <div class="pane form" id="form-faction" role="tabpanel" aria-labelledby="tab-faction" hidden>
+
+    <div class="roster" id="roster-faction"></div>
+
+    <div class="lorebook-bar">
+      <label for="lorebookNameFac">Lorebook name</label>
+      <input id="lorebookNameFac" placeholder="e.g. Kaldrenn Keep — factions" autocomplete="off" spellcheck="false">
+      <span class="lorebook-note">Exports as a SillyTavern World Info .json. Each faction becomes one keyed entry. Injected only when its trigger words appear in recent chat.</span>
+    </div>
+
+    <p class="lede">Guilds, gangs, families, academies, companies, cults. Any group that acts as a unit. Write it so the model knows how members behave in a scene.</p>
+    <p class="lede ww-disclaimer">You don't have to fill out every field. Only fill the ones you want the AI to pay attention to.</p>
+
+    <details class="sec" open>
+      <summary>Identity<span class="count" data-for="identity"></span><span class="tok" data-tok="identity"></span></summary>
+      <div class="body">
+        <div class="grid2">
+          <div class="field"><label>Type</label><input data-k="type" placeholder="Guild, gang, family, academy, order"></div>
+          <div class="field"><label>Territory / base</label><input data-k="territory" placeholder="Harbor district. The old customs house."></div>
+        </div>
+        <div class="field"><label>Size &amp; reach</label><input data-k="reach" placeholder="Forty people, one city. Or: eight, but they own the docks."></div>
+        <div class="field"><label>Trigger words</label><input data-k="keys" placeholder="Comma-separated. Leave blank to key on the name." autocomplete="off"></div>
+        <p class="hint">Size and reach calibrate how much weight the model gives them. Without it, every group reads as either a street gang or a world power.</p>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>What they want<span class="count" data-for="goal"></span><span class="tok" data-tok="goal"></span></summary>
+      <div class="body">
+        <p class="hint">The group's goal, and whether members actually believe in it. Members who privately doubt the mission behave differently.</p>
+        <div class="field"><textarea data-k="goal" placeholder="Control who unloads at the quay, and keep the harbormaster's office out of it. Most members just want steady work."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>How they operate<span class="count" data-for="methods"></span><span class="tok" data-tok="methods"></span></summary>
+      <div class="body">
+        <p class="hint">What they do to get what they want, and what they won't do.</p>
+        <div class="field"><textarea data-k="methods" placeholder="Bribes first, broken hands second. They don't kill — a body brings the Union in, and nobody wants that."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>How they treat outsiders<span class="count" data-for="outsiders"></span><span class="tok" data-tok="outsiders"></span></summary>
+      <div class="body">
+        <p class="hint">What the model uses when a member shares a scene with a non-member. Cover the default reception and what changes it.</p>
+        <div class="field"><textarea data-k="outsiders" placeholder="Polite and useless to strangers. Warmer if you've worked a shift on the quay. Openly hostile to anyone asking about the harbormaster."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Who's in it<span class="count" data-for="members"></span><span class="tok" data-tok="members"></span></summary>
+      <div class="body">
+        <p class="hint">Leadership and notable members. Name and one-line role. Full profiles live on the characters tab.</p>
+        <div class="rows" data-list="members"></div>
+        <button class="add" data-add="members">+ Add member</button>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Rules &amp; code<span class="count" data-for="code"></span><span class="tok" data-tok="code"></span></summary>
+      <div class="body">
+        <p class="hint">Internal rules, and what happens when one is broken. This makes members act like members.</p>
+        <div class="rows" data-list="code"></div>
+        <button class="add" data-add="code">+ Add rule</button>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Rivals &amp; allies<span class="count" data-for="relations"></span><span class="tok" data-tok="relations"></span></summary>
+      <div class="body">
+        <p class="hint">Who they're against, who they're with, and how open about it. One line each.</p>
+        <div class="rows" data-list="relations"></div>
+        <button class="add" data-add="relations">+ Add</button>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Current state<span class="count" data-for="state"></span><span class="tok" data-tok="state"></span></summary>
+      <div class="body">
+        <p class="hint">What they're doing right now, and how they're faring. Update as the story moves.</p>
+        <div class="field"><textarea data-k="state" placeholder="Down two people since the winter. Stretched thin covering the night shift, and everyone knows it."></textarea></div>
+      </div>
+    </details>
+
+  </div>
+
+  <!-- ============ HISTORY FORM ============ -->
+  <div class="pane form" id="form-history" role="tabpanel" aria-labelledby="tab-history" hidden>
+
+    <div class="roster" id="roster-history"></div>
+
+    <div class="lorebook-bar">
+      <label for="lorebookNameHist">Lorebook name</label>
+      <input id="lorebookNameHist" placeholder="e.g. Kaldrenn Keep — history" autocomplete="off" spellcheck="false">
+      <span class="lorebook-note">Exports as a SillyTavern World Info .json. Each event becomes one keyed entry. Injected only when its trigger words appear in recent chat.</span>
+    </div>
+
+    <p class="lede">One event per entry. The last section matters most. An event that doesn't change the present is trivia the model won't use.</p>
+    <p class="lede ww-disclaimer">You don't have to fill out every field. Only fill the ones you want the AI to pay attention to.</p>
+
+    <details class="sec" open>
+      <summary>Identity<span class="count" data-for="identity"></span><span class="tok" data-tok="identity"></span></summary>
+      <div class="body">
+        <div class="grid2">
+          <div class="field"><label>When</label><input data-k="when" placeholder="Twelve years ago. Last winter. The year the bridge fell."></div>
+          <div class="field"><label>Where</label><input data-k="where" placeholder="Kaldrenn Keep, lower cells"></div>
+        </div>
+        <div class="field"><label>Trigger words</label><input data-k="keys" placeholder="Comma-separated. Leave blank to key on the name." autocomplete="off"></div>
+        <p class="hint">Key it on what people would actually say when they bring it up.</p>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>What happened<span class="count" data-for="event"></span><span class="tok" data-tok="event"></span></summary>
+      <div class="body">
+        <p class="hint">The event itself. Keep it short. This part bloats easily and the model uses it least. If the official version differs from the truth, put the official one in the second field. NPCs can repeat it while the narration knows better.</p>
+        <div class="field"><label>What really happened</label><textarea data-k="event" style="min-height:100px" placeholder="The garrison mutinied over back pay. The commander locked himself in the keep. It was over in a night; eleven dead, most of them on the stairs."></textarea></div>
+        <div class="field"><label>What people say happened</label><textarea data-k="officialAccount" placeholder="A fire in the lower cells. The commander is credited with getting most of the men out."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Who was in it<span class="count" data-for="who"></span><span class="tok" data-tok="who"></span></summary>
+      <div class="body">
+        <p class="hint">Name and what they did. One line each. Full profiles live on the character tabs.</p>
+        <div class="rows" data-list="who"></div>
+        <button class="add" data-add="who">+ Add person</button>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>How it affects the present<span class="count" data-for="effect"></span><span class="tok" data-tok="effect"></span></summary>
+      <div class="body">
+        <p class="hint">What is different now because this happened. Who still hates whom, what's still broken, what nobody mentions. If you can't fill this in, cut the event.</p>
+        <div class="field"><textarea data-k="effect" style="min-height:100px" placeholder="The stairs are still stained and nobody uses the lower cells. Gully was a junior clerk that night and hasn't slept a full night since. Guards don't take back-pay complaints lightly — they pay on time now, out of fear."></textarea></div>
+      </div>
+    </details>
+
+  </div>
+
+  <!-- ============ CONCEPT FORM ============ -->
+  <div class="pane form" id="form-concept" role="tabpanel" aria-labelledby="tab-concept" hidden>
+
+    <div class="roster" id="roster-concept"></div>
+
+    <div class="lorebook-bar">
+      <label for="lorebookNameCon">Lorebook name</label>
+      <input id="lorebookNameCon" placeholder="e.g. Kaldrenn Keep — concepts" autocomplete="off" spellcheck="false">
+      <span class="lorebook-note">Exports as a SillyTavern World Info .json. Each concept becomes one keyed entry. Injected only when its trigger words appear in recent chat.</span>
+    </div>
+
+    <p class="lede">For anything that isn't a person, place, object, group, or event. Magic systems, religions, laws, customs, diseases, currencies, ranks, species. The fields are built to make the concept show up in scenes.</p>
+    <p class="lede ww-disclaimer">You don't have to fill out every field. Only fill the ones you want the AI to pay attention to.</p>
+
+    <details class="sec" open>
+      <summary>Identity<span class="count" data-for="identity"></span><span class="tok" data-tok="identity"></span></summary>
+      <div class="body">
+        <div class="grid2">
+          <div class="field"><label>Category</label><input data-k="category" placeholder="Magic, religion, law, custom, disease, currency, rank, species"></div>
+          <div class="field"><label>Who knows about it</label><input data-k="scope" placeholder="Everyone. Only clergy. A rumor. A secret."></div>
+        </div>
+        <div class="field"><label>Trigger words</label><input data-k="keys" placeholder="Comma-separated. Leave blank to key on the name." autocomplete="off"></div>
+        <p class="hint">"Who knows about it" decides whether a character can mention it casually, needs to explain it, or shouldn't know it exists. Key on the everyday word people use for it.</p>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>What it is<span class="count" data-for="definition"></span><span class="tok" data-tok="definition"></span></summary>
+      <div class="body">
+        <p class="hint">Plain definition, be concise, preferably in a couple of sentences.</p>
+        <div class="field"><textarea data-k="definition" placeholder="Tallow-debt: an informal loan between neighbours, tracked by notches on a shared candle. Paying it back means burning the candle down together."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>How it works<span class="count" data-for="mechanics"></span><span class="tok" data-tok="mechanics"></span></summary>
+      <div class="body">
+        <p class="hint">The mechanics. Steps, conditions, what has to happen. For magic this is the system, for a custom the ritual, for a law the enforcement.</p>
+        <div class="field"><textarea data-k="mechanics" placeholder="A candle is cut at the moment of the loan. Both parties keep a half. Repayment is done in person, candle lit, no coin changes hands until it's out."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>Rules &amp; limits<span class="count" data-for="limits"></span><span class="tok" data-tok="limits"></span></summary>
+      <div class="body">
+        <p class="hint">What it can't do, what breaks it, what it costs. A concept with no limits gets used to solve everything.</p>
+        <div class="rows" data-list="limits"></div>
+        <button class="add" data-add="limits">+ Add</button>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>How people treat it<span class="count" data-for="attitude"></span><span class="tok" data-tok="attitude"></span></summary>
+      <div class="body">
+        <p class="hint">Revered, feared, illegal, mundane, taboo, embarrassing. What saying its name does to a room.</p>
+        <div class="field"><textarea data-k="attitude" placeholder="Ordinary among the poor, faintly shameful among anyone with money. Refusing a tallow-debt is a real insult; calling one in early is worse."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>What it looks like in a scene<span class="count" data-for="signs"></span><span class="tok" data-tok="signs"></span></summary>
+      <div class="body">
+        <p class="hint">The signs of it. What you'd see, hear, or smell. This gives the model something to write.</p>
+        <div class="field"><textarea data-k="signs" placeholder="Half-candles on windowsills. Two people sitting silent in a doorway watching a flame burn down. A cut candle handed over without a word."></textarea></div>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>What people get wrong about it<span class="count" data-for="misconceptions"></span><span class="tok" data-tok="misconceptions"></span></summary>
+      <div class="body">
+        <p class="hint">The gap between what's believed and what's true. Gives NPCs something to be wrong about.</p>
+        <div class="rows" data-list="misconceptions"></div>
+        <button class="add" data-add="misconceptions">+ Add</button>
+      </div>
+    </details>
+
+  </div>
+
+  <!-- ============ GUIDE ============ -->
+  <div class="pane credits guide" id="form-guide" role="tabpanel" aria-labelledby="tab-guide" hidden>
+    <div class="credits-inner guide-inner">
+
+      <div class="g-eyebrow">Writer's Workbench</div>
+      <h1>Field Manual</h1>
+      <p class="g-intro">How the model reads what you write, and why the fields in this tool are shaped the way they are.</p>
+      <p class="g-disclaimer">These are heuristics. Different models and presets behave differently. Use them to make behaviour more reliable.</p>
+
+      <h2 class="g-part">Writing for the AI</h2>
+
+      <section class="g">
+        <div class="g-num">01</div>
+        <div class="g-body">
+          <h3>Context is attention</h3>
+          <p>Everything in context competes for the model's attention. More lore does not mean better writing. A 900-token card that is all behaviour will usually outperform a 3,000-token card that is mostly trivia.</p>
+          <p class="g-rule">Ask: if the model ignored this detail for ten messages, would I care? If not, leave it out.</p>
+        </div>
+      </section>
+
+      <section class="g">
+        <div class="g-num">02</div>
+        <div class="g-body">
+          <h3>Blank means improvise</h3>
+          <p>An empty field tells the model to decide when it matters. A filled field is a fact it will try to preserve. <code>Eyes: green</code> means green eyes may come up repeatedly. Leaving it blank means you don't care.</p>
+          <p class="g-rule">Only fill the fields you want held fixed. Don't fill a field because it exists.</p>
+        </div>
+      </section>
+
+      <section class="g">
+        <div class="g-num">03</div>
+        <div class="g-body">
+          <h3>The model assumes details matter</h3>
+          <p>Information in context is treated as information that exists for a reason. Mention a revolver under a coat and it will eventually come out. Mention a sealed door beneath the house and the story will become interested in the door.</p>
+          <p class="g-rule">Don't mention an interesting detail unless you're comfortable with the story noticing it.</p>
+        </div>
+      </section>
+
+      <section class="g">
+        <div class="g-num">04</div>
+        <div class="g-body">
+          <h3>The model can read every secret</h3>
+          <p>Anything in a card or lorebook is visible to the model. Writing a secret down risks the model bringing it up early. State who knows and who doesn't instead.</p>
+          <p>For a mystery that matters, state the boundary in plain terms:</p>
+          <pre class="g-ex">Truth: Mara stole the relic.
+Known by: Mara only.
+Ly believes: the relic was destroyed.
+Ly must not suspect Mara without finding evidence.</pre>
+          <p class="g-rule">Gaps between characters work. The model can't keep a gap from the player. Don't build a scenario whose payoff depends on the model keeping a secret from you. For a big reveal, keep the fact out of always-on context until it's needed.</p>
+        </div>
+      </section>
+
+      <section class="g">
+        <div class="g-num">05</div>
+        <div class="g-body">
+          <h3>Don't write the ending</h3>
+          <p>"Eventually Alice discovers Bob's betrayal and kills him" puts the conclusion in context. Even if it doesn't happen immediately, everything now leans toward it.</p>
+          <p>Better: "Alice trusts Bob completely. Bob caused the accident she has spent years investigating." The situation exists and the scene stays open.</p>
+          <p class="g-rule">Define pressures, motives, and facts. Leave the outcome open unless you want it forced.</p>
+        </div>
+      </section>
+
+      <section class="g">
+        <div class="g-num">06</div>
+        <div class="g-body">
+          <h3>Writing it down makes it true</h3>
+          <p>Writing that Kira is half-dragon makes it true. It doesn't ask for scales and dragon blood in every reply. If the model over-focuses on a trait, reduce the emphasis. Another paragraph about it makes the problem worse.</p>
+        </div>
+      </section>
+
+      <section class="g">
+        <div class="g-num">07</div>
+        <div class="g-body">
+          <h3>Presets and cards</h3>
+          <p>Most presets set a tone, genre, or theme. The same goes for a rule stated in the card and again in an author's note. It can cause conflicts or produce behaviour you don't want.</p>
+          <p class="g-rule">Keep that in mind when writing characters and lore.</p>
+        </div>
+      </section>
+
+      <h2 class="g-part">Writing characters</h2>
+
+      <section class="g">
+        <div class="g-num">08</div>
+        <div class="g-body">
+          <h3>Write behaviour</h3>
+          <p>"Shy, awkward, insecure" is a good start, but using triggers can make it more interesting and specific. "When complimented, she assumes the speaker is joking and changes the subject."</p>
+          <p>"Hotheaded." What makes this character a hothead? "When someone questions his competence in front of others, he immediately tries to prove them wrong" gives a scene.</p>
+          <p class="g-rule">That's what the Psychology section is built for.</p>
+        </div>
+      </section>
+
+      <section class="g">
+        <div class="g-num">09</div>
+        <div class="g-body">
+          <h3>Specific sticks, general slides off</h3>
+          <p>"Likes food" never appears on screen. "Steals the crispy skin off everyone else's roast chicken when she thinks they aren't looking" will. "Kind" does nothing. "Remembers how everyone takes their tea and starts making it before they ask" does.</p>
+        </div>
+      </section>
+
+      <section class="g">
+        <div class="g-num">10</div>
+        <div class="g-body">
+          <h3>Contradictions give the model choices</h3>
+          <p>A healer who enjoys fighting. A cynic who badly wants to believe people are good. Someone fiercely independent who hates being alone. Two real pulls in opposite directions give the model several plausible responses.</p>
+          <p class="g-rule">If the contradiction never creates a decision the character struggles with, it isn't one yet.</p>
+        </div>
+      </section>
+
+      <section class="g">
+        <div class="g-num">11</div>
+        <div class="g-body">
+          <h3>Repeat deliberately</h3>
+          <p>"Proud. Hates losing. Competitive. Needs to be the best. Gets angry when outperformed." That's one trait five times. Repetition raises emphasis, but it also spends context and can turn into a tic the model reproduces every turn.</p>
+          <p class="g-rule">If a trait is central, reinforce it once on purpose with a tag, a trigger, and a line of dialogue.</p>
+        </div>
+      </section>
+
+      <section class="g">
+        <div class="g-num">12</div>
+        <div class="g-body">
+          <h3>A want and a pressure</h3>
+          <p>A character with something they want and something in the way generates scenes on their own. One without either waits to be asked a question.</p>
+        </div>
+      </section>
+
+      <h2 class="g-part">Writing worlds</h2>
+
+      <section class="g">
+        <div class="g-num">13</div>
+        <div class="g-body">
+          <h3>Consequences make the world playable</h3>
+          <p>"The Great War lasted from 812 to 826 and involved seven kingdoms" is a fact. "People from Aldor still refuse to marry into Vessian families because of the war" is a scene waiting to happen.</p>
+          <p class="g-rule">For every piece of lore, answer: what happens now because of this? If nothing, cut it.</p>
+        </div>
+      </section>
+
+      <section class="g">
+        <div class="g-num">14</div>
+        <div class="g-body">
+          <h3>Only make entries for things you want to come up</h3>
+          <p>Generic items, a town your character visited with barely any detail to it, a place you're not interested in visiting: none of these need an entry. At the very most, keep it concise.</p>
+        </div>
+      </section>
+
+      <section class="g">
+        <div class="g-num">15</div>
+        <div class="g-body">
+          <h3>Trigger words are what people say</h3>
+          <p>Key an entry on the words that will actually appear in conversation. "The Stair Mutiny" is what a historian calls it; "the mutiny" is what a guard says. A location called "the kitchen" keyed on its name fires on every kitchen in the story.</p>
+        </div>
+      </section>
+
+      <section class="g">
+        <div class="g-num">16</div>
+        <div class="g-body">
+          <h3>Write a strong first message</h3>
+          <p>Write a high quality first message to set the tone for the chat. Preferably handwritten by yourself, or edited by you if you used AI.</p>
+        </div>
+      </section>
+
+      <p class="cr-foot">Most of these are lifted from the hints beside each field. This page is the same advice in one place.</p>
+
+    </div>
+  </div>
+
+  <!-- ============ CREDITS ============ -->
+  <div class="pane credits" id="form-credits" role="tabpanel" aria-labelledby="tab-credits" hidden>
+    <div class="credits-inner">
+      <h1>Credits</h1>
+
+      <section class="cr">
+        <h2>Template origin</h2>
+        <p>The section structure this builder is built around comes from <strong>Character Foundry</strong> by <strong>u/Due_Opportunity8693</strong>, posted on r/SillyTavernAI.</p>
+        <p><a href="https://www.reddit.com/r/SillyTavernAI/s/RfsFOscQy1" target="_blank" rel="noopener noreferrer">Original post on r/SillyTavernAI</a></p>
+      </section>
+
+      <section class="cr">
+        <h2>Template adaptation</h2>
+        <p>The version of the template used here — the specific sections, their order, the core-contradiction and irrational-quirk framing, and the XML-wrapped output format — was adapted and reworked by <strong>Deiomo</strong> for their own cards.</p>
+      </section>
+
+      <section class="cr">
+        <h2>This tool</h2>
+        <p>Built by <strong>Claude</strong> (Anthropic) at Deiomo's direction, under the name <strong>Writer's Workbench</strong>. Claude wrote the code and the section choices for each tab; the template the Main and Side tabs generate is Deiomo's.</p>
+      </section>
+
+      <section class="cr">
+        <h2>About the token counts</h2>
+        <p>Token numbers shown next to each section are <strong>estimates</strong>. This file runs offline with no tokenizer library, so it approximates from character and word counts. Expect it to land within roughly 10–15% of a real BPE count for ordinary English prose, and to drift further on heavy punctuation, unusual names, or non-English text. Use it to compare sections against each other.</p>
+      </section>
+
+      <section class="cr">
+        <h2>Using it</h2>
+        <ul>
+          <li>Type the name once. It fills the wrapper tag and every section tag in the output, so a character named Kou exports as <code>&lt;Kou&gt;</code> with sections like <code>&lt;Kou_backstory&gt;</code>.</li>
+          <li>Every field is optional. Empty sections are dropped from the output unless you turn off <em>Hide empty sections</em>.</li>
+          <li>The <strong>Scenario</strong> tab holds setting blocks. They export as a lorebook with a single <em>constant</em> entry — always injected, no keyword needed — so keep them tight.</li>
+          <li>The <strong>Locations</strong> tab exports a lorebook of keyed entries. Each fires when its trigger words appear — set them yourself for generic names like "the kitchen".</li>
+          <li>The <strong>Concepts</strong> tab is the catch-all — magic systems, religions, laws, customs, species, currencies. Keyed like the others.</li>
+          <li>The <strong>History</strong> tab holds one event per entry, keyed like the others. The "how it affects the present" section is the reason the entry exists — fill that or cut the event.</li>
+          <li>The <strong>Factions</strong> tab covers any group that acts as a unit. Keyed like Locations and Items.</li>
+          <li>The <strong>Items</strong> tab works like Locations — keyed entries with overridable trigger words. Keep it to objects that have limits and that someone wants.</li>
+          <li>Main characters can also be exported as a lorebook, keyed or always-on — useful for group chats or for a lead who gets mentioned while off-screen. For a character the chat is actually with, the .md into the card description is still the right call.</li>
+          <li>Both card tabs hold a roster — switch between characters with the chips at the top. The side tab Add as many characters as a scenario needs, then export the whole roster as a SillyTavern World Info <strong>.json</strong> — one entry per character, keyed on their name. SillyTavern takes the lorebook name from the filename on import.</li>
+          <li><strong>Save .json</strong> stores the whole roster of the tab you're on. Loading a roster file replaces that tab's roster; loading an older single-card file adds it as a new entry. There is no autosave.</li>
+          <li><strong>Ctrl/Cmd + S</strong> saves the current tab as .json.</li>
+          <li>Runs offline. The font is the only thing loaded from the internet, and it falls back cleanly without one.</li>
+        </ul>
+      </section>
+
+      <p class="cr-foot">Free to use, modify, and redistribute. If you pass this on, keep the attribution above intact.</p>
+    </div>
+  </div>
+
+  <!-- ============ PREVIEW ============ -->
+  <div class="pane preview">
+    <div class="pv-head">
+      <span class="pv-title" id="pvTitle">Markdown output</span>
+      <span id="totalTok" title="Estimated, not a real tokenizer count">~0 tokens</span>
+      <label class="toggle"><input type="checkbox" id="hideEmpty" checked> Hide empty sections</label>
+      <div class="pv-actions">
+        <button class="btn" id="btnCopy">Copy</button>
+        <button class="btn" id="btnAll" hidden>Download lorebook .json</button>
+        <button class="btn primary" id="btnMd">Download .md</button>
+      </div>
+    </div>
+    <pre id="out"></pre>
+  </div>
+
+</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ================= config ================= */
+const LISTS = {
+  tags:          {ph:"Quiet",                      multiline:false, bullet:"-"},
+  triggers:      {ph:"When they're complimented, they deflect and redirect credit.", multiline:true, bullet:""},
+  hobbies:       {ph:"Boxing",                     multiline:false, bullet:"-"},
+  likes:         {ph:"Hot tea, quiet mornings",    multiline:false, bullet:"-"},
+  dislikes:      {ph:"Being called fragile",       multiline:false, bullet:"-"},
+  fears:         {ph:"Being helpless again",       multiline:false, bullet:"-"},
+  kinks:         {ph:"Being pinned — the relief of someone else deciding", multiline:true, bullet:"-"},
+  limitsNsfw:    {ph:"Being treated as fragile. Kills it instantly.", multiline:true, bullet:"-"},
+  normal:        {ph:"Everyone carries a knife. Nobody comments on it.", multiline:true, bullet:"-"},
+  actions:       {ph:"Buy a drink, rent a room, hear dock gossip", multiline:false, bullet:"-"},
+  objects:       {ph:"A ship's bell behind the bar — rung for last call, or for trouble", multiline:true, bullet:"-"},
+  people:        {ph:"Marla — owner, sleeps upstairs, hears everything", multiline:true, bullet:"-"},
+  rules:         {ph:"No weapons drawn inside. Marla keeps a crossbow under the bar to enforce it.", multiline:true, bullet:"-"},
+  limits:        {ph:"Nosebleed after each use. Three uses in a day and the wearer passes out.", multiline:true, bullet:"-"},
+  members:       {ph:"Marla — runs the quay crew, sleeps above the Anchor", multiline:true, bullet:"-"},
+  code:          {ph:"Never talk to the Union. Anyone who does stops getting shifts.", multiline:true, bullet:"-"},
+  relations:     {ph:"The harbormaster's office — open enemies, everyone knows it", multiline:true, bullet:"-"},
+  who:           {ph:"Gully dan Bach — junior clerk, survived by hiding in the records room", multiline:true, bullet:"-"},
+  misconceptions:{ph:"Outsiders think it's about the money. It's about being seen to sit together.", multiline:true, bullet:"-"},
+  relationships: {ph:"Kuro — twin sister. Codependent, communicate by bickering.", multiline:true, bullet:"-"},
+  dialogue:      {ph:"\"If it works, it works.\"", multiline:true,  bullet:"-"}
+};
+const LIST_KEYS = {
+  main: ["tags","triggers","hobbies","likes","dislikes","fears","kinks","limitsNsfw","relationships","dialogue"],
+  side: ["tags","triggers","dialogue"],
+  scenario: ["normal"],
+  location: ["actions","objects","people","rules"],
+  item: ["limits"],
+  faction: ["members","code","relations"],
+  history: ["who"],
+  concept: ["limits","misconceptions"]
+};
+
+function blankState(kind){
+  const lists = {};
+  LIST_KEYS[kind].forEach(k=>{ lists[k] = [""]; });
+  if(kind==="main") lists.dialogue = ["","",""];
+  if(kind==="side"){ lists.tags = ["","",""]; lists.dialogue = ["",""]; }
+  if(kind==="scenario"){ lists.normal = ["","",""]; }
+  if(kind==="location"){ lists.actions=["",""]; lists.objects=["",""]; lists.people=[""]; lists.rules=[""]; }
+  if(kind==="item"){ lists.limits=["",""]; }
+  if(kind==="faction"){ lists.members=["",""]; lists.code=[""]; lists.relations=[""]; }
+  if(kind==="history"){ lists.who=["",""]; }
+  if(kind==="concept"){ lists.limits=["",""]; lists.misconceptions=[""]; }
+  return {name:"", fields:{}, lists:lists};
+}
+
+const S = { main: {list:[blankState("main")], active:0}, side: {list:[blankState("side")], active:0}, scenario: {list:[blankState("scenario")], active:0}, location: {list:[blankState("location")], active:0}, item: {list:[blankState("item")], active:0}, faction: {list:[blankState("faction")], active:0}, history: {list:[blankState("history")], active:0}, concept: {list:[blankState("concept")], active:0} };
+let mode = "main";
+function cur(){ return S[mode].list[S[mode].active]; }
+
+const $  = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const pane = () => $("#form-"+mode);
+const out = $("#out");
+const nameInput = $("#charName");
+
+/* ================= token estimate =================
+   No tokenizer offline. Approximated two ways and the larger wins:
+   ~4 chars per token (prose average) and ~1.15 tokens per whitespace word.
+   Good enough to compare sections; not exact. ================= */
+function estTokens(s){
+  if(!s) return 0;
+  const words = (s.match(/\S+/g)||[]).length;
+  return Math.max(Math.round(s.length/4), Math.round(words*1.15));
+}
+function fmtTok(n){ return n >= 1000 ? (n/1000).toFixed(1)+"k" : String(n); }
+window.wwEstTokens = estTokens;   // shared with the visual layer so both counts agree
+
+/* ================= name helpers ================= */
+function nm(){ return cur().name.trim() || "[Name]"; }
+function poss(){ return nm() + "'s"; }
+function tagOf(st, kind){ return kind==="scenario" ? "scenario" : (st.name.trim().replace(/\s+/g,"") || "name"); }
+function labelOf(st, kind){
+  if(kind==="scenario") return (st.fields.location||"").trim() || "Scenario";
+  return st.name.trim() || "Untitled";
+}
+
+/* ================= list rendering ================= */
+function renderList(key){
+  const wrap = pane().querySelector('[data-list="'+key+'"]');
+  if(!wrap) return;
+  const cfg = LISTS[key];
+  const arr = cur().lists[key];
+  wrap.innerHTML = "";
+  arr.forEach((val,i)=>{
+    const row = document.createElement("div");
+    row.className = "row";
+    const b = document.createElement("span");
+    b.className = "bullet"; b.textContent = cfg.bullet || (i+1)+".";
+    const inp = document.createElement(cfg.multiline ? "textarea" : "input");
+    if(cfg.multiline) inp.rows = 2;
+    inp.value = val; inp.placeholder = cfg.ph;
+    inp.addEventListener("input", e=>{ arr[i] = e.target.value; render(); });
+    const x = document.createElement("button");
+    x.className = "x"; x.type = "button"; x.textContent = "×";
+    x.title = "Remove"; x.setAttribute("aria-label","Remove item");
+    x.addEventListener("click", ()=>{
+      arr.splice(i,1);
+      if(!arr.length) arr.push("");
+      renderList(key); render();
+    });
+    row.append(b, inp, x);
+    wrap.appendChild(row);
+  });
+}
+
+/* ================= segment builders =================
+   Each returns [{key, md}] so per-section token counts are exact
+   against what actually ends up in the output. ================= */
+function seg(st, kind, hide){
+  const g = k => (st.fields[k]||"").trim();
+  const listOf = k => (st.lists[k]||[]).map(s=>s.trim()).filter(Boolean);
+  const name = st.name.trim() || "[Name]";
+  const P = name + "'s";
+  const S_ = [];
+  const push = (key, md)=>{ if(md && md.trim()) S_.push({key:key, md:md.trim()}); };
+  const kv = pairs => pairs.map(p=>(!p[1] && hide) ? null : p[0]+": "+(p[1]||"")).filter(Boolean);
+  const block = (key,h,t)=>{ if(!t && hide) return; push(key, "# "+h+"\n\n"+(t||"")); };
+  const bullets = (key,h,arr)=>{ if(!arr.length && hide) return; push(key, "# "+h+"\n\n"+(arr.length ? arr.map(s=>"- "+s).join("\n") : "- ")); };
+  const status = ()=>{
+    const sw=g("statusWhere"), sf=g("statusFeel");
+    if(!sw && !sf && hide) return;
+    const parts=[];
+    if(sw||!hide) parts.push("Where they are now: "+sw);
+    if(sf||!hide) parts.push("How they feel about it: "+sf);
+    push("status", "# "+P+" Current Status\n\n"+parts.join("\n\n"));
+  };
+
+  if(kind==="concept"){
+    const id = kv([["Name", name==="[Name]" ? "" : name],["Category",g("category")],["Who knows about it",g("scope")]]);
+    push("identity", "## "+name+(id.length ? "\n\n"+id.join("\n") : ""));
+    block("definition", "What It Is", g("definition"));
+    block("mechanics", "How It Works", g("mechanics"));
+    bullets("limits", "Rules & Limits", listOf("limits"));
+    block("attitude", "How People Treat It", g("attitude"));
+    block("signs", "What It Looks Like in a Scene", g("signs"));
+    bullets("misconceptions", "What People Get Wrong About It", listOf("misconceptions"));
+    return S_;
+  }
+
+  if(kind==="history"){
+    const id = kv([["Name", name==="[Name]" ? "" : name],["When",g("when")],["Where",g("where")]]);
+    push("identity", "## "+name+(id.length ? "\n\n"+id.join("\n") : ""));
+    const ev=g("event"), oa=g("officialAccount");
+    if(ev||oa||!hide){
+      const parts=[];
+      if(ev||!hide) parts.push("What really happened:\n"+ev);
+      if(oa) parts.push("What people say happened:\n"+oa);
+      push("event", "# What Happened\n\n"+parts.join("\n\n"));
+    }
+    bullets("who", "Who Was In It", listOf("who"));
+    block("effect", "How It Affects the Present", g("effect"));
+    return S_;
+  }
+
+  if(kind==="faction"){
+    const id = kv([["Name", name==="[Name]" ? "" : name],["Type",g("type")],["Territory",g("territory")],["Size & reach",g("reach")]]);
+    push("identity", "## "+name+(id.length ? "\n\n"+id.join("\n") : ""));
+    block("goal", "What They Want", g("goal"));
+    block("methods", "How They Operate", g("methods"));
+    block("outsiders", "How They Treat Outsiders", g("outsiders"));
+    bullets("members", "Who's In It", listOf("members"));
+    bullets("code", "Rules & Code", listOf("code"));
+    bullets("relations", "Rivals & Allies", listOf("relations"));
+    block("state", "Current State", g("state"));
+    return S_;
+  }
+
+  if(kind==="item"){
+    const id = kv([["Name", name==="[Name]" ? "" : name],["Type",g("type")],["Kept at",g("keptAt")],["Carried by",g("carriedBy")]]);
+    push("identity", "## "+name+(id.length ? "\n\n"+id.join("\n") : ""));
+    block("appearance", "Appearance", g("appearance"));
+    block("function", "What It Does", g("function"));
+    block("usage", "How It's Used", g("usage"));
+    bullets("limits", "Limits & Costs", listOf("limits"));
+    block("stakes", "Who Wants It / Why It Matters", g("stakes"));
+    block("state", "Current State", g("state"));
+    return S_;
+  }
+
+  if(kind==="location"){
+    const id = kv([["Name", name==="[Name]" ? "" : name],["Type",g("type")],["Part of",g("partOf")]]);
+    push("identity", "## "+name+(id.length ? "\n\n"+id.join("\n") : ""));
+    block("vibe", "Vibe & Senses", g("vibe"));
+    block("access", "Ways In and Out / What's Nearby", g("access"));
+    block("traffic", "Who's Usually Here / How Busy", g("traffic"));
+    bullets("actions", "What You Can Do Here", listOf("actions"));
+    bullets("objects", "Notable Objects", listOf("objects"));
+    bullets("people", "Notable People", listOf("people"));
+    bullets("rules", "Rules & Dangers", listOf("rules"));
+    block("time", "How It Changes With Time", g("time"));
+    return S_;
+  }
+
+  if(kind==="scenario"){
+    const loc=g("location"), set=g("setting");
+    const idPairs = kv([["Location",loc],["Genre",g("genre")],["Themes",g("themes")]]);
+    push("identity", "## Scenario"+(idPairs.length ? "\n\n"+idPairs.join("\n") : ""));
+    if(set||!hide) push("setting", "# Setting\n\n"+set);
+    const st1=g("story"), st2=g("storyGoal"), st3=g("storyPressure");
+    if(st1||st2||st3||!hide){
+      const parts=[];
+      if(st1||!hide) parts.push("What's going on:\n"+st1);
+      if(st2||!hide) parts.push("What it's driving toward:\n"+st2);
+      if(st3||!hide) parts.push("If nobody acts:\n"+st3);
+      push("story", "# Overarching Story\n\n"+parts.join("\n\n"));
+    }
+
+    const tl=g("techLabel"), tc=g("tech");
+    if(tl||tc||!hide){
+      const parts=[];
+      if(tl||!hide) parts.push("Era: "+tl);
+      if(tc||!hide) parts.push(tc);
+      push("tech", "# Level of Technology\n\n"+parts.filter(Boolean).join("\n\n"));
+    }
+    block("mood", "Overall Mood", g("mood"));
+    bullets("normal", "What's Normal Here", listOf("normal"));
+    return S_;
+  }
+
+  if(kind==="main"){
+    const id = kv([["Name", name==="[Name]" ? "" : name],["Full name",g("fullName")],["Aliases",g("aliases")],["Age",g("age")],["Race",g("race")],
+                   ["Species",g("species")],["Sexual Orientation",g("orientation")],
+                   ["Occupation",g("occupation")],["Goal",g("goal")]]);
+    push("identity", "## "+name+(id.length ? "\n\n"+id.join("\n") : ""));
+    status();
+
+    const ap = kv([["Height",g("height")],[P+" Skin",g("skin")],[P+" Eyes",g("eyes")],
+                   [P+" Hair",g("hair")],[P+" Face",g("face")],[P+" Body Type",g("body")],[P+" usual clothes",g("clothes")]]);
+    if(ap.length || g("vibe") || !hide){
+      let t = "# "+P+" Appearance & Vibe\n\n";
+      if(ap.length) t += ap.join("\n");
+      if(g("vibe")) t += (ap.length ? "\n\n" : "")+g("vibe");
+      push("appearance", t);
+    }
+
+    const nsfwPairs = kv([["Chest",g("chest")],["Hips & rear",g("hips")],["Genitals",g("genitals")],["Body & pubic hair",g("bodyHair")]]);
+    const nsfwFree = [["Usual underwear",g("underwear")],["Marks",g("marks")],["Scent & skin",g("scent")],["Other",g("nsfwOther")]].filter(x=>x[1]);
+    if(nsfwPairs.length || nsfwFree.length || !hide){
+      let t = "# "+P+" Body & Intimate Details\n\n";
+      if(nsfwPairs.length) t += nsfwPairs.join("\n");
+      nsfwFree.forEach(x=>{ t += (t.endsWith("\n\n") ? "" : "\n\n")+x[0]+": "+x[1]; });
+      push("nsfwLook", t);
+    }
+
+    const an = kv([[P+" Coat",g("coat")],[P+" Ears",g("ears")],[P+" Tail",g("tail")],
+                   [P+" Muzzle & Teeth",g("muzzle")],[P+" Hands & Feet",g("pawsHands")],
+                   [P+" Build & Stance",g("stance")]]);
+    const anOther = g("anthroOther");
+    if(st.fields.useAnthro && (an.length || anOther)){
+      let t = "# "+P+" Non-Human Features\n\n";
+      if(an.length) t += an.join("\n");
+      if(anOther) t += (an.length ? "\n\n" : "")+anOther;
+      push("anthro", t);
+    }
+
+    block("presence", P+" Presence & Body Language", g("presence"));
+    block("backstory", P+" Backstory", g("backstory"));
+    const ab=g("abilities"), wk=g("weaknesses");
+    if(ab||wk||!hide){
+      const parts=[];
+      if(ab||!hide) parts.push("Abilities/Skills:\n"+ab);
+      if(wk||!hide) parts.push("Weaknesses:\n"+wk);
+      push("abilities", "# "+P+" Abilities, Skills & Weaknesses\n\n"+parts.join("\n\n"));
+    }
+    bullets("tags", P+" Personality Tags", listOf("tags"));
+
+    const tg = listOf("triggers");
+    const belief = [["Core belief",g("coreBelief")],["Protective strategy",g("protectiveStrategy")],
+                    ["Emotional need",g("emotionalNeed")],["Conditions for change",g("changeCondition")]]
+                    .filter(x=>x[1]).map(x=>x[0]+": "+x[1]);
+    const know = [["Knows",g("knows")],["Wrongly believes",g("wrongBelief")]].filter(x=>x[1]).map(x=>x[0]+": "+x[1]);
+    if(tg.length || belief.length || know.length || !hide){
+      const parts = [];
+      if(tg.length) parts.push(tg.join("\n\n"));
+      if(belief.length) parts.push(belief.join("\n"));
+      if(know.length) parts.push(know.join("\n"));
+      push("triggers", "# "+P+" Psychology & Behavioral Triggers\n\n"+parts.join("\n\n"));
+    }
+
+    block("contradiction", "Core Contradiction", g("contradiction"));
+
+    const iC=g("intimacy"), iD=g("drawnTo"), iF=g("friction");
+    if(iC||iD||iF||listOf("kinks").length||listOf("limitsNsfw").length||!hide){
+      const parts=[];
+      if(iC) parts.push("Core dynamic: "+iC);
+      if(iD) parts.push("Drawn to:\n"+iD);
+      if(iF) parts.push("Friction points:\n"+iF);
+      const kk=listOf("kinks"), kl=listOf("limitsNsfw");
+      if(kk.length) parts.push("Kinks & turn-ons:\n"+kk.map(x=>"- "+x).join("\n"));
+      if(kl.length) parts.push("Turn-offs & hard limits:\n"+kl.map(x=>"- "+x).join("\n"));
+      push("intimacy", "# "+P+" Intimacy & Vulnerability\n\n"+parts.join("\n\n"));
+    }
+
+    bullets("hobbies", P+" Hobbies and Interests", listOf("hobbies"));
+
+    const lk=listOf("likes"), dl=listOf("dislikes"), fr=listOf("fears");
+    if(lk.length||dl.length||fr.length||!hide){
+      const parts=[];
+      if(lk.length||!hide) parts.push("Likes:\n"+(lk.length ? lk.map(x=>"- "+x).join("\n") : "- "));
+      if(dl.length||!hide) parts.push("Dislikes:\n"+(dl.length ? dl.map(x=>"- "+x).join("\n") : "- "));
+      if(fr.length||!hide) parts.push("Fears:\n"+(fr.length ? fr.map(x=>"- "+x).join("\n") : "- "));
+      push("likes", "# "+P+" Likes, Dislikes & Fears\n\n"+parts.join("\n\n"));
+    }
+    block("quirks", P+" Quirks", g("quirks"));
+    block("personalGoal", P+" Personal Goal", g("personalGoal"));
+
+    const rel = listOf("relationships");
+    if(rel.length || !hide){
+      push("relationships", "# "+P+" Relationships\n\n"+(rel.length ? rel.map(r=>"- "+name+" to "+r).join("\n") : "- "));
+    }
+  } else {
+    const id = kv([["Name", name==="[Name]" ? "" : name],["Full name",g("fullName")],["Aliases",g("aliases")],
+                   ["Age",g("age")],["Race",g("race")],["Role",g("role")]]);
+    push("identity", "## "+name+(id.length ? "\n\n"+id.join("\n") : ""));
+    status();
+    block("look", P+" Look", g("look"));
+    block("presence", P+" Presence & Body Language", g("presence"));
+    let fn = "";
+    if(g("function")) fn += "# "+P+" Function in the Story\n\n"+g("function");
+    if(g("connection")) fn += (fn?"\n\n":"")+"# "+P+" Connection to the Cast\n\n"+g("connection");
+    if(fn || !hide) push("function", fn || "# "+P+" Function in the Story\n\n");
+    bullets("tags", P+" Personality Tags", listOf("tags"));
+    const tg = listOf("triggers");
+    const know = [["Knows",g("knows")],["Wrongly believes",g("wrongBelief")]].filter(x=>x[1]).map(x=>x[0]+": "+x[1]);
+    if(tg.length || know.length || !hide){
+      const parts = [];
+      if(tg.length) parts.push(tg.join("\n\n"));
+      if(know.length) parts.push(know.join("\n"));
+      push("triggers", "# "+P+" Behavior\n\n"+parts.join("\n\n"));
+    }
+    block("want", P+" Want", g("want"));
+    block("quirk", P+" Quirk", g("quirk"));
+  }
+
+  // voice (shared shape)
+  const dlg = listOf("dialogue");
+  let allDlg = dlg;
+  if(PROMPTS_FOR[kind] && st.fields.usePrompts){
+    const answered = PROMPTS_FOR[kind]
+      .map(pr=>(st.fields["dlg_"+pr[0]]||"").trim())
+      .filter(Boolean);
+    allDlg = answered.concat(dlg);
+  }
+  if(g("tone")||allDlg.length||!hide){
+    let v = "# Voice & Example Dialogue\n\nTone: "+g("tone");
+    if(allDlg.length) v += "\n\nExample Dialogue:\n"+allDlg.map(d=>"- "+d).join("\n");
+    push("voice", v);
+  }
+  return S_;
+}
+
+/* Section tag names. Keys are the push() keys used in seg(); values are the
+   suffix used in <Name_suffix>. Per-kind overrides win over the shared map. */
+const SECTION_TAGS = {
+  _shared: {
+    identity:"identity", status:"current_status", appearance:"appearance", nsfwLook:"body",
+    anthro:"non_human_features", presence:"presence", backstory:"backstory", abilities:"abilities", tags:"personality",
+    triggers:"psychology", contradiction:"core_contradiction", intimacy:"intimacy",
+    hobbies:"hobbies", likes:"likes_dislikes_fears", quirks:"quirks", personalGoal:"personal_goal",
+    relationships:"relationships", voice:"voice"
+  },
+  side:     { look:"look", "function":"function_in_story", want:"want", quirk:"quirk", triggers:"behavior" },
+  scenario: { setting:"setting", story:"overarching_story", tech:"technology", mood:"mood", normal:"whats_normal" },
+  location: { vibe:"vibe", access:"ways_in_and_out", traffic:"whos_here", actions:"what_you_can_do",
+              objects:"notable_objects", people:"notable_people", rules:"rules_and_dangers", time:"over_time" },
+  item:     { appearance:"appearance", "function":"what_it_does", usage:"how_its_used", limits:"limits_and_costs",
+              stakes:"who_wants_it", state:"current_state" },
+  faction:  { goal:"what_they_want", methods:"how_they_operate", outsiders:"outsiders", members:"members",
+              code:"rules_and_code", relations:"rivals_and_allies", state:"current_state" },
+  history:  { event:"what_happened", who:"who_was_there", effect:"effect_on_present" },
+  concept:  { definition:"what_it_is", mechanics:"how_it_works", limits:"rules_and_limits",
+              attitude:"how_people_treat_it", signs:"in_a_scene", misconceptions:"misconceptions" }
+};
+function sectionTag(kind, key){
+  const k = (SECTION_TAGS[kind] && SECTION_TAGS[kind][key]) || SECTION_TAGS._shared[key] || key;
+  return k.replace(/[^A-Za-z0-9_]/g,"_").toLowerCase();
+}
+/* Strip the markdown heading a segment starts with; the XML tag now names the section. */
+function stripHeading(md){
+  return md.replace(/^#{1,3} [^\n]*(\n+|$)/, "").trim();
+}
+function wrapSeg(st, kind, x){
+  const base = tagOf(st, kind);
+  const t = base + "_" + sectionTag(kind, x.key);
+  const body = stripHeading(x.md);
+  if(!body) return "";
+  return "<"+t+">\n" + body + "\n</"+t+">";
+}
+function cardMd(st, kind, hide){
+  const parts = seg(st, kind, hide).map(x=>wrapSeg(st, kind, x)).filter(Boolean);
+  return "<"+tagOf(st,kind)+">\n" + parts.join("\n\n").replace(/\n{3,}/g,"\n\n").trim() + "\n</"+tagOf(st,kind)+">\n";
+}
+function build(){ return cardMd(cur(), mode, $("#hideEmpty").checked); }
+
+/* ================= preview ================= */
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function render(){
+  const md = build();
+  let html = esc(md);
+  html = html.replace(/^(&lt;\/?[A-Za-z0-9_.\-]+&gt;)$/gm, '<span class="h">$1</span>');
+  const n = cur().name.trim();
+  if(n){
+    const safe = n.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+    html = html.replace(new RegExp(safe,"g"), '<span class="n">'+esc(n)+'</span>');
+  }else{
+    html = html.replace(/\[Name\]/g, '<span class="n">[Name]</span>');
+  }
+  out.innerHTML = html;
+
+  // per-section tokens
+  const segs = seg(cur(), mode, $("#hideEmpty").checked);
+  const byKey = {};
+  segs.forEach(x=>{ byKey[x.key] = (byKey[x.key]||0) + estTokens(wrapSeg(cur(), mode, x)); });
+  Array.from(pane().querySelectorAll(".tok")).forEach(el=>{
+    const t = byKey[el.dataset.tok] || 0;
+    el.textContent = t ? "~"+fmtTok(t)+"t" : "";
+    el.classList.toggle("heavy", t >= 150);
+  });
+
+  const total = estTokens(md);
+  const tt = $("#totalTok");
+  tt.textContent = "~"+fmtTok(total)+" tokens";
+  tt.classList.toggle("heavy", total >= 900);
+
+  updateCounts();
+  renderRoster();
+  autosave();
+}
+
+const COUNT_MAP = {
+  main:{identity:["fullName","aliases","age","race","species","orientation","occupation","goal"],
+        appearance:["height","skin","eyes","hair","face","body","clothes","vibe"],
+        anthro:["coat","ears","tail","muzzle","pawsHands","stance","anthroOther"],
+        status:["statusWhere","statusFeel"], presence:["presence"],
+        triggers:["coreBelief","protectiveStrategy","emotionalNeed","changeCondition","knows","wrongBelief"],
+        nsfwLook:["chest","hips","genitals","bodyHair","underwear","marks","scent","nsfwOther"],
+        backstory:["backstory"], abilities:["abilities","weaknesses"], contradiction:["contradiction"],
+        intimacy:["intimacy","drawnTo","friction"], quirks:["quirks"],
+        personalGoal:["personalGoal"], voice:["tone"]},
+  scenario:{setting:["location","genre","themes","setting"], story:["story","storyGoal","storyPressure"], tech:["techLabel","tech"], mood:["mood"]},
+  location:{identity:["type","partOf","keys"], vibe:["vibe"], access:["access"], traffic:["traffic"], time:["time"]},
+  item:{identity:["type","keptAt","carriedBy","keys"], appearance:["appearance"], "function":["function"], usage:["usage"], stakes:["stakes"], state:["state"]},
+  faction:{identity:["type","territory","reach","keys"], goal:["goal"], methods:["methods"], outsiders:["outsiders"], state:["state"]},
+  history:{identity:["when","where","keys"], event:["event","officialAccount"], effect:["effect"]},
+  concept:{identity:["category","scope","keys"], definition:["definition"], mechanics:["mechanics"], attitude:["attitude"], signs:["signs"]},
+  side:{identity:["fullName","aliases","age","race","role"], triggers:["knows","wrongBelief"], status:["statusWhere","statusFeel"], look:["look"], presence:["presence"], "function":["function","connection"],
+        want:["want"], quirk:["quirk"], voice:["tone"]}
+};
+const COUNT_LISTS = {
+  main:{tags:["tags"],triggers:["triggers"],hobbies:["hobbies"],likes:["likes","dislikes","fears"],intimacy:["kinks","limitsNsfw"],relationships:["relationships"],voice:["dialogue"]},
+  side:{tags:["tags"],triggers:["triggers"],voice:["dialogue"]},
+  scenario:{normal:["normal"]},
+  location:{actions:["actions"],objects:["objects"],people:["people"],rules:["rules"]},
+  item:{limits:["limits"]},
+  faction:{members:["members"],code:["code"],relations:["relations"]},
+  history:{who:["who"]},
+  concept:{limits:["limits"],misconceptions:["misconceptions"]}
+};
+
+function updateCounts(){
+  const st = cur(), fmap = COUNT_MAP[mode], lmap = COUNT_LISTS[mode];
+  Array.from(pane().querySelectorAll(".count")).forEach(el=>{
+    const key = el.dataset.for;
+    let filled=0, total=0;
+    (fmap[key]||[]).forEach(k=>{ total++; if((st.fields[k]||"").trim()) filled++; });
+    (lmap[key]||[]).forEach(k=>{
+      const arr = st.lists[k]||[];
+      filled += arr.filter(s=>s.trim()).length;
+      total  += Math.max(arr.length,1);
+    });
+    el.textContent = filled ? filled+"/"+total : "";
+    el.classList.toggle("filled", total>0 && filled===total);
+  });
+}
+
+/* ================= roster ================= */
+function renderRoster(){
+  const R = S[mode], kind = mode;
+  const box = $("#roster-"+mode);
+  box.innerHTML = "";
+  const hide = $("#hideEmpty").checked;
+  let grand = 0;
+
+  R.list.forEach((st,i)=>{
+    const t = estTokens(cardMd(st,kind,hide));
+    grand += t;
+    const chip = document.createElement("div");
+    chip.className = "chip" + (i===R.active ? " active" : "");
+
+    const btn = document.createElement("button");
+    btn.className = "chip-name"; btn.type = "button";
+    btn.textContent = labelOf(st, kind);
+    btn.title = "Switch to this character";
+    btn.addEventListener("click", ()=>{ R.active = i; hydrate(); });
+
+    const tk = document.createElement("span");
+    tk.className = "chip-tok"; tk.textContent = "~"+fmtTok(t);
+
+    const x = document.createElement("button");
+    x.className = "chip-x"; x.type = "button"; x.textContent = "×";
+    x.setAttribute("aria-label","Remove "+(st.name.trim()||"this character"));
+    x.title = "Remove from roster";
+    x.addEventListener("click", e=>{
+      e.stopPropagation();
+      const label = st.name.trim() || "this untitled character";
+      if(!confirm("Remove "+label+" from the roster? This can't be undone.")) return;
+      R.list.splice(i,1);
+      if(!R.list.length) R.list.push(blankState(kind));
+      R.active = Math.min(R.active, R.list.length-1);
+      hydrate();
+      toast("Removed from roster");
+    });
+
+    chip.append(btn, tk, x);
+    box.appendChild(chip);
+  });
+
+  const add = document.createElement("button");
+  add.className = "roster-add"; add.type = "button"; add.textContent = "+ New";
+  add.addEventListener("click", ()=>{
+    R.list.push(blankState(kind));
+    R.active = R.list.length-1;
+    hydrate();
+    nameInput.focus();
+  });
+  box.appendChild(add);
+
+  const dup = document.createElement("button");
+  dup.className = "roster-add"; dup.type = "button"; dup.textContent = "Duplicate";
+  dup.title = "Copy the current character as a new roster entry";
+  dup.addEventListener("click", ()=>{
+    const copy = JSON.parse(JSON.stringify(cur()));
+    copy.name = (copy.name.trim() ? copy.name.trim()+" copy" : "");
+    R.list.splice(R.active+1, 0, copy);
+    R.active += 1;
+    hydrate();
+  });
+  box.appendChild(dup);
+
+  const meta = document.createElement("span");
+  meta.className = "roster-meta";
+  const noun = ({scenario:[" scenario"," scenarios"], location:[" location"," locations"], item:[" item"," items"], faction:[" faction"," factions"], history:[" event"," events"], concept:[" concept"," concepts"]})[mode] || [" character"," characters"];
+  meta.textContent = R.list.length + (R.list.length===1?noun[0]:noun[1]) + " · ~"+fmtTok(grand)+"t total";
+  box.appendChild(meta);
+}
+
+/* ================= mode switching ================= */
+function setMode(next){
+  $$(".tab").forEach(t=> t.setAttribute("aria-selected", String(t.dataset.mode===next)));
+  $("#form-main").hidden    = (next!=="main");
+  $("#form-side").hidden    = (next!=="side");
+  $("#form-scenario").hidden= (next!=="scenario");
+  $("#form-location").hidden= (next!=="location");
+  $("#form-item").hidden    = (next!=="item");
+  $("#form-faction").hidden = (next!=="faction");
+  $("#form-history").hidden = (next!=="history");
+  $("#form-concept").hidden = (next!=="concept");
+  $("#form-credits").hidden = (next!=="credits");
+  $("#form-guide").hidden   = (next!=="guide");
+  const isStatic = (next==="credits" || next==="guide");
+  $(".preview").hidden      = isStatic;
+  $(".namebar").hidden      = isStatic || next==="scenario";
+  $(".toolbar").hidden      = isStatic;
+  $("#btnAll").hidden       = isStatic;
+  if(isStatic) return;
+  mode = next;
+  $("#pvTitle").textContent = ({main:"Markdown output", side:"Markdown output — side card", scenario:"Markdown output — scenario", location:"Markdown output — location", item:"Markdown output — item", faction:"Markdown output — faction", history:"Markdown output — event", concept:"Markdown output — concept"})[mode];
+  nameInput.placeholder = ({main:"main character name…", side:"side character name…", scenario:"scenario name…", location:"location name…", item:"item name…", faction:"faction name…", history:"event name…", concept:"concept name…"})[mode];
+  $("#btnAll").hidden = false;
+  $("#btnAll").textContent = (mode==="scenario" ? "Download lorebook .json (constant)" : "Download lorebook .json");
+  $("#btnClear").textContent = "Clear this one";
+  hydrate();
+}
+$$(".tab").forEach(t=> t.addEventListener("click", ()=> setMode(t.dataset.mode)));
+
+/* ================= wiring ================= */
+nameInput.addEventListener("input", e=>{ cur().name = e.target.value; render(); });
+
+$$("[data-bool]").forEach(el=>{
+  el.addEventListener("change", ()=>{
+    const owner = el.closest(".form").id.replace("form-","");
+    S[owner].list[S[owner].active].fields[el.dataset.k] = el.checked;
+    syncPromptVisibility();
+    syncAnthroVisibility();
+    render();
+  });
+});
+
+$$("[data-k]:not([data-bool])").forEach(el=>{
+  el.addEventListener("input", ()=>{
+    const owner = el.closest(".form").id.replace("form-","");
+    const st = S[owner].list[S[owner].active];
+    st.fields[el.dataset.k] = el.value;
+    render();
+  });
+});
+
+$$("[data-add]").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    const k = btn.dataset.add;
+    cur().lists[k].push("");
+    renderList(k);
+    const rows = pane().querySelectorAll('[data-list="'+k+'"] .row');
+    rows[rows.length-1].querySelector("input,textarea").focus();
+    render();
+  });
+});
+
+$("#hideEmpty").addEventListener("change", render);
+
+/* ================= toast ================= */
+let tid;
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(tid); tid = setTimeout(()=>t.classList.remove("show"), 1900);
+}
+
+/* ================= actions ================= */
+function slugify(s, fallback){
+  return (s||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || fallback;
+}
+function slug(){
+  const base = mode==="scenario" ? (cur().fields.location||"") : cur().name;
+  return slugify(base, ({main:"character", side:"side-character", scenario:"scenario", location:"location", item:"item", faction:"faction", history:"event", concept:"concept"})[mode]);
+}
+function download(text, filename, mime){
+  const blob = new Blob([text],{type:mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+
+$("#btnCopy").addEventListener("click", async ()=>{
+  const md = build();
+  try{ await navigator.clipboard.writeText(md); toast("Copied to clipboard"); }
+  catch(e){
+    const ta = document.createElement("textarea");
+    ta.value = md; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); toast("Copied to clipboard"); }
+    catch(_){ toast("Copy blocked — select the text manually"); }
+    ta.remove();
+  }
+});
+
+$("#btnMd").addEventListener("click", ()=>{
+  download(build(), slug()+".md", "text/markdown");
+  toast("Downloaded "+slug()+".md");
+});
+
+/* ---- SillyTavern World Info export ----
+   ST reads the lorebook name from the FILENAME on import; there is no
+   name field inside the file. We still write one so the JSON is self-describing. */
+function lorebookKeys(name){
+  const n = name.trim();
+  if(!n) return [];
+  const keys = [n];
+  const STOP = /^(the|a|an|of|mr|mrs|ms|dr|sir|lady|lord|old|little|big)\.?$/i;
+  // secondary key: name with a leading article stripped ("The Rusty Anchor" -> "Rusty Anchor")
+  const noArticle = n.replace(/^(the|a|an)\s+/i,"").trim();
+  if(noArticle && noArticle.toLowerCase()!==n.toLowerCase()) keys.push(noArticle);
+  // short key: first meaningful word, if the name has more than one ("Ly Nguyen" -> "Ly", "Mr. Heedle" -> "Heedle")
+  const words = noArticle.split(/\s+/).filter(Boolean);
+  if(words.length > 1){
+    const w = words.find(x=>!STOP.test(x) && x.replace(/[^\w]/g,"").length>=2);
+    if(w && !keys.some(k=>k.toLowerCase()===w.toLowerCase())) keys.push(w.replace(/[.,]+$/,""));
+  }
+  return keys;
+}
+function lorebookEntry(uid, st, hide, kind){
+  const name = labelOf(st, kind)==="Untitled" ? "Untitled "+(uid+1) : labelOf(st, kind);
+  const isConst = (kind==="scenario") || (kind==="main" && document.getElementById("mainConstant").checked);
+  let keys = isConst ? [] : lorebookKeys(name);
+  if(["location","item","faction","history","concept"].includes(kind)){
+    const custom = (st.fields.keys||"").split(",").map(x=>x.trim()).filter(Boolean);
+    if(custom.length) keys = custom;
+  }
+  if(!isConst && (kind==="side" || kind==="main")){
+    // aliases become extra trigger words so the entry fires on a nickname too
+    (st.fields.aliases||"").split(",").map(x=>x.trim()).filter(Boolean).forEach(a=>{
+      if(!keys.some(k=>k.toLowerCase()===a.toLowerCase())) keys.push(a);
+    });
+  }
+  return {
+    uid: uid,
+    key: keys,
+    keysecondary: [],
+    comment: name,
+    content: cardMd(st,kind,hide).trim(),
+    constant: isConst,
+    vectorized: false,
+    selective: !isConst,
+    selectiveLogic: 0,
+    addMemo: true,
+    order: 100,
+    position: 0,
+    disable: false,
+    excludeRecursion: false,
+    preventRecursion: false,
+    delayUntilRecursion: false,
+    probability: 100,
+    useProbability: true,
+    depth: 4,
+    group: "",
+    groupOverride: false,
+    groupWeight: 100,
+    scanDepth: null,
+    caseSensitive: null,
+    matchWholeWords: null,
+    useGroupScoring: null,
+    automationId: "",
+    role: null,
+    sticky: 0,
+    cooldown: 0,
+    delay: 0,
+    displayIndex: uid
+  };
+}
+function lorebookInput(){ return ({main:$("#lorebookNameMain"), location:$("#lorebookNameLoc"), item:$("#lorebookNameItem"), faction:$("#lorebookNameFac"), history:$("#lorebookNameHist"), concept:$("#lorebookNameCon")})[mode] || $("#lorebookName"); }
+function lorebookSlug(){
+  const fallback = ({main:"main-characters", location:"locations", item:"items", faction:"factions", history:"history", concept:"concepts"})[mode] || "side-characters";
+  const n = lorebookInput().value.trim() || fallback;
+  return n.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || fallback;
+}
+$("#btnAll").addEventListener("click", ()=>{
+  const hide = $("#hideEmpty").checked;
+  const entries = {};
+  let bookName, fname;
+  if(mode==="scenario"){
+    // one file per active scenario: a single constant entry
+    const st = cur();
+    entries["0"] = lorebookEntry(0, st, hide, "scenario");
+    bookName = st.name.trim() || "Scenario";
+    fname = slug()+"-setting.json";
+  }else{
+    const kind = mode; // any keyed kind
+    S[kind].list.forEach((st,i)=>{ entries[String(i)] = lorebookEntry(i, st, hide, kind); });
+    bookName = lorebookInput().value.trim() || ({main:"Main characters", location:"Locations", item:"Items", faction:"Factions", history:"History", concept:"Concepts"})[kind] || "Side characters";
+    fname = lorebookSlug()+".json";
+  }
+  const book = { name: bookName, entries: entries };
+  download(JSON.stringify(book,null,2), fname, "application/json");
+  toast("Downloaded "+fname+" ("+Object.keys(entries).length+(Object.keys(entries).length===1?" entry":" entries")+(mode==="scenario"?", constant":"")+")");
+});
+
+$("#btnSave").addEventListener("click", ()=>{
+  let payload, fname;
+  if(mode==="main"){
+    payload = {cardType:"main-roster", lorebookName:$("#lorebookNameMain").value, constant:$("#mainConstant").checked, roster:S.main.list};
+    fname = (lorebookSlug()==="main-characters" ? "main-roster" : lorebookSlug()+"-roster")+".json";
+  }else if(mode==="scenario"){
+    payload = {cardType:"scenario-roster", roster:S.scenario.list};
+    fname = "scenario-roster.json";
+  }else if(mode==="location"){
+    payload = {cardType:"location-roster", lorebookName:$("#lorebookNameLoc").value, roster:S.location.list};
+    fname = (lorebookSlug()==="locations" ? "location-roster" : lorebookSlug()+"-roster")+".json";
+  }else if(mode==="item"){
+    payload = {cardType:"item-roster", lorebookName:$("#lorebookNameItem").value, roster:S.item.list};
+    fname = (lorebookSlug()==="items" ? "item-roster" : lorebookSlug()+"-roster")+".json";
+  }else if(mode==="faction"){
+    payload = {cardType:"faction-roster", lorebookName:$("#lorebookNameFac").value, roster:S.faction.list};
+    fname = (lorebookSlug()==="factions" ? "faction-roster" : lorebookSlug()+"-roster")+".json";
+  }else if(mode==="history"){
+    payload = {cardType:"history-roster", lorebookName:$("#lorebookNameHist").value, roster:S.history.list};
+    fname = (lorebookSlug()==="history" ? "history-roster" : lorebookSlug()+"-roster")+".json";
+  }else if(mode==="concept"){
+    payload = {cardType:"concept-roster", lorebookName:$("#lorebookNameCon").value, roster:S.concept.list};
+    fname = (lorebookSlug()==="concepts" ? "concept-roster" : lorebookSlug()+"-roster")+".json";
+  }else{
+    payload = {cardType:"side-roster", lorebookName:$("#lorebookName").value, roster:S.side.list};
+    fname = (lorebookSlug()==="side-characters" ? "side-roster" : lorebookSlug()+"-roster")+".json";
+  }
+  download(JSON.stringify(payload,null,2), fname, "application/json");
+  toast("Saved "+fname);
+});
+
+$("#btnLoad").addEventListener("click", ()=> $("#fileIn").click());
+
+function coerce(d, kind){
+  const fresh = blankState(kind);
+  fresh.name = typeof d.name==="string" ? d.name : "";
+  fresh.fields = (d.fields && typeof d.fields==="object") ? d.fields : {};
+  LIST_KEYS[kind].forEach(k=>{
+    const v = d.lists && d.lists[k];
+    if(Array.isArray(v) && v.length) fresh.lists[k] = v.slice();
+  });
+  return fresh;
+}
+
+$("#fileIn").addEventListener("change", e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    try{
+      const d = JSON.parse(r.result);
+      if(!d || typeof d!=="object") throw 0;
+
+      if(d.cardType==="side-roster" && Array.isArray(d.roster) && d.roster.length){
+        if(!confirm("Replace the current roster with "+d.roster.length+" character(s) from this file?")){ e.target.value=""; return; }
+        S.side.list = d.roster.map(x=>coerce(x,"side"));
+        if(typeof d.lorebookName==="string") $("#lorebookName").value = d.lorebookName;
+        S.side.active = 0;
+        setMode("side");
+        toast("Loaded roster of "+S.side.list.length);
+      } else if(d.cardType==="side"){
+        S.side.list.push(coerce(d,"side"));
+        S.side.active = S.side.list.length-1;
+        setMode("side");
+        toast("Added "+(d.name||"card")+" to the roster");
+      } else if(d.cardType==="concept-roster" && Array.isArray(d.roster) && d.roster.length){
+        if(!confirm("Replace the current concept roster with "+d.roster.length+" concept(s) from this file?")){ e.target.value=""; return; }
+        S.concept.list = d.roster.map(x=>coerce(x,"concept"));
+        if(typeof d.lorebookName==="string") $("#lorebookNameCon").value = d.lorebookName;
+        S.concept.active = 0;
+        setMode("concept");
+        toast("Loaded "+S.concept.list.length+" concept(s)");
+      } else if(d.cardType==="history-roster" && Array.isArray(d.roster) && d.roster.length){
+        if(!confirm("Replace the current history roster with "+d.roster.length+" event(s) from this file?")){ e.target.value=""; return; }
+        S.history.list = d.roster.map(x=>coerce(x,"history"));
+        if(typeof d.lorebookName==="string") $("#lorebookNameHist").value = d.lorebookName;
+        S.history.active = 0;
+        setMode("history");
+        toast("Loaded "+S.history.list.length+" event(s)");
+      } else if(d.cardType==="faction-roster" && Array.isArray(d.roster) && d.roster.length){
+        if(!confirm("Replace the current faction roster with "+d.roster.length+" faction(s) from this file?")){ e.target.value=""; return; }
+        S.faction.list = d.roster.map(x=>coerce(x,"faction"));
+        if(typeof d.lorebookName==="string") $("#lorebookNameFac").value = d.lorebookName;
+        S.faction.active = 0;
+        setMode("faction");
+        toast("Loaded "+S.faction.list.length+" faction(s)");
+      } else if(d.cardType==="item-roster" && Array.isArray(d.roster) && d.roster.length){
+        if(!confirm("Replace the current item roster with "+d.roster.length+" item(s) from this file?")){ e.target.value=""; return; }
+        S.item.list = d.roster.map(x=>coerce(x,"item"));
+        if(typeof d.lorebookName==="string") $("#lorebookNameItem").value = d.lorebookName;
+        S.item.active = 0;
+        setMode("item");
+        toast("Loaded "+S.item.list.length+" item(s)");
+      } else if(d.cardType==="location-roster" && Array.isArray(d.roster) && d.roster.length){
+        if(!confirm("Replace the current location roster with "+d.roster.length+" location(s) from this file?")){ e.target.value=""; return; }
+        S.location.list = d.roster.map(x=>coerce(x,"location"));
+        if(typeof d.lorebookName==="string") $("#lorebookNameLoc").value = d.lorebookName;
+        S.location.active = 0;
+        setMode("location");
+        toast("Loaded "+S.location.list.length+" location(s)");
+      } else if(d.cardType==="scenario-roster" && Array.isArray(d.roster) && d.roster.length){
+        if(!confirm("Replace the current scenario roster with "+d.roster.length+" scenario(s) from this file?")){ e.target.value=""; return; }
+        S.scenario.list = d.roster.map(x=>coerce(x,"scenario"));
+        S.scenario.active = 0;
+        setMode("scenario");
+        toast("Loaded "+S.scenario.list.length+" scenario(s)");
+      } else if(d.cardType==="main-roster" && Array.isArray(d.roster) && d.roster.length){
+        if(!confirm("Replace the current main roster with "+d.roster.length+" character(s) from this file?")){ e.target.value=""; return; }
+        S.main.list = d.roster.map(x=>coerce(x,"main"));
+        if(typeof d.lorebookName==="string") $("#lorebookNameMain").value = d.lorebookName;
+        $("#mainConstant").checked = !!d.constant;
+        S.main.active = 0;
+        setMode("main");
+        toast("Loaded roster of "+S.main.list.length);
+      } else {
+        S.main.list.push(coerce(d,"main"));
+        S.main.active = S.main.list.length-1;
+        setMode("main");
+        toast("Added "+(d.name||f.name)+" to the main roster");
+      }
+    }catch(_){ toast("That file isn't a saved character card"); }
+    e.target.value = "";
+  };
+  r.readAsText(f);
+});
+
+$("#btnClear").addEventListener("click", ()=>{
+  const label = cur().name.trim() || "this untitled character";
+  if(!confirm("Clear "+label+"? The rest of the roster is untouched.")) return;
+  S[mode].list[S[mode].active] = blankState(mode);
+  toast("Cleared card");
+  hydrate();
+});
+
+/* ================= hydrate ================= */
+/* ================= dialogue writing prompts ================= */
+const DLG_PROMPTS = [
+  ["happy",       "They're in a good mood. Something went right, or someone gave them something."],
+  ["sad",         "They just got bad news."],
+  ["angry",       "You pissed them off."],
+  ["neutral",     "Nothing is happening. Small talk, or a dull errand."],
+  ["bumped",      "A stranger bumps into them in the street."],
+  ["complimented","Someone compliments them directly, to their face."],
+  ["refuse",      "They're asked to do something they don't want to do."],
+  ["caught",      "They're caught in a mistake, or a lie."],
+  ["stranger",    "They meet someone new for the first time."],
+  ["threat",      "Someone they care about is threatened."],
+  ["private",     "Someone asks about their past, or something they don't discuss."],
+  ["flirt",       "Someone flirts with them."],
+  ["pressure",    "They're under real pressure. Danger, a deadline, no good options."]
+];
+
+const DLG_PROMPTS_SIDE = [
+  ["meet",     "Meeting {{user}} for the first time."],
+  ["ask",      "{{user}} wants something from them."],
+  ["annoyed",  "{{user}} has annoyed them."],
+  ["domain",   "Talking about their own work, the thing they're here for."],
+  ["wrong",    "Something goes wrong in front of them."]
+];
+const PROMPTS_FOR = { main: DLG_PROMPTS, side: DLG_PROMPTS_SIDE };
+
+function buildPromptRows(){
+  const list = PROMPTS_FOR[mode];
+  if(!list) return;
+  const box = document.getElementById("promptRows-"+mode);
+  if(!box || box.dataset.built) return;
+  list.forEach(pr=>{
+    const wrap = document.createElement("div");
+    wrap.className = "field";
+    const lab = document.createElement("label");
+    lab.textContent = pr[1];
+    const ta = document.createElement("textarea");
+    ta.rows = 2;
+    ta.dataset.k = "dlg_"+pr[0];
+    ta.addEventListener("input", ()=>{ cur().fields[ta.dataset.k] = ta.value; render(); });
+    wrap.append(lab, ta);
+    box.appendChild(wrap);
+  });
+  box.dataset.built = "1";
+}
+
+function syncAnthroVisibility(){
+  const box = document.getElementById("anthroRows");
+  if(!box) return;
+  box.hidden = !(mode==="main" && cur().fields.useAnthro);
+}
+
+function syncPromptVisibility(){
+  if(!PROMPTS_FOR[mode]) return;
+  const on = !!(cur().fields.usePrompts);
+  const box = document.getElementById("promptRows-"+mode);
+  const hint = document.getElementById("promptHint-"+mode);
+  if(box) box.hidden = !on;
+  if(hint) hint.hidden = !on;
+}
+
+/* ================= autosave ================= */
+const AUTOSAVE_KEY = "writers-workbench-v1";
+const LORE_IDS = ["lorebookNameMain","lorebookName","lorebookNameLoc","lorebookNameItem","lorebookNameFac","lorebookNameHist","lorebookNameCon"];
+let storageOK = false;
+try{
+  const probe = "__ww_probe__";
+  window.localStorage.setItem(probe,"1");
+  window.localStorage.removeItem(probe);
+  storageOK = true;
+}catch(_){ storageOK = false; }
+
+function snapshot(){
+  const lore = {};
+  LORE_IDS.forEach(id=>{ const el = document.getElementById(id); if(el) lore[id] = el.value; });
+  return {
+    v: 1, mode: mode, rosters: S, lore: lore,
+    mainConstant: $("#mainConstant") ? $("#mainConstant").checked : false,
+    hideEmpty: $("#hideEmpty").checked,
+    savedAt: Date.now()
+  };
+}
+
+function setSaveStatus(text, dim){
+  const el = $("#saveStatus");
+  if(!el) return;
+  el.textContent = text;
+  el.style.opacity = dim ? "0.55" : "1";
+}
+
+let saveTimer = null;
+function autosave(){
+  if(!storageOK) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{
+    try{
+      window.localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(snapshot()));
+      const t = new Date();
+      setSaveStatus("Saved "+String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0"), true);
+    }catch(err){
+      setSaveStatus((err && err.name)==="QuotaExceededError" ? "Storage full, export a .json" : "Autosave failed", false);
+    }
+  }, 400);
+}
+
+function restore(){
+  if(!storageOK){ setSaveStatus("Autosave off here", true); return false; }
+  let raw;
+  try{ raw = window.localStorage.getItem(AUTOSAVE_KEY); }catch(_){ return false; }
+  if(!raw) return false;
+  try{
+    const d = JSON.parse(raw);
+    if(!d || d.v !== 1 || !d.rosters) return false;
+    Object.keys(S).forEach(k=>{
+      const r = d.rosters[k];
+      if(r && Array.isArray(r.list) && r.list.length){
+        S[k].list = r.list.map(x=>coerce(x,k));
+        S[k].active = Math.min(Math.max(0, r.active|0), S[k].list.length-1);
+      }
+    });
+    if(d.lore) LORE_IDS.forEach(id=>{ const el=document.getElementById(id); if(el && typeof d.lore[id]==="string") el.value = d.lore[id]; });
+    if($("#mainConstant")) $("#mainConstant").checked = !!d.mainConstant;
+    if(typeof d.hideEmpty === "boolean") $("#hideEmpty").checked = d.hideEmpty;
+    if(d.mode && S[d.mode]) mode = d.mode;
+    return true;
+  }catch(_){ return false; }
+}
+
+function clearAutosave(){ try{ window.localStorage.removeItem(AUTOSAVE_KEY); }catch(_){} }
+
+function hydrate(){
+  const st = cur();
+  buildPromptRows();
+  nameInput.value = st.name;
+  Array.from(pane().querySelectorAll("[data-k]")).forEach(el=>{
+    if(el.dataset.bool) el.checked = !!st.fields[el.dataset.k];
+    else el.value = st.fields[el.dataset.k] || "";
+  });
+  syncPromptVisibility();
+  syncAnthroVisibility();
+  LIST_KEYS[mode].forEach(renderList);
+  render();
+}
+
+$("#btnWipe").addEventListener("click", ()=>{
+  if(!confirm("Erase every tab and the saved copy in this browser? Export a .json first if you want to keep any of it.")) return;
+  Object.keys(S).forEach(k=>{ S[k] = {list:[blankState(k)], active:0}; });
+  LORE_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.value=""; });
+  if($("#mainConstant")) $("#mainConstant").checked = false;
+  clearAutosave();
+  setMode("main");
+  setSaveStatus("Cleared", true);
+  toast("Everything cleared");
+});
+
+document.addEventListener("keydown", e=>{
+  if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="s"){
+    if($("#form-credits").hidden === false || $("#form-guide").hidden === false) return;
+    e.preventDefault(); $("#btnSave").click();
+  }
+});
+
+LORE_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener("input", autosave); });
+if($("#mainConstant")) $("#mainConstant").addEventListener("change", autosave);
+
+const restored = restore();
+setMode(mode);
+if(restored) toast("Restored your last session");
+else if(storageOK) setSaveStatus("Autosave on", true);
+nameInput.focus();
+})();
+</script>
+
+<!-- ================= MIDNIGHT ARCHIVE VISUAL UPGRADE ================= -->
+<style>
+:root{
+  --bg:#101419;
+  --panel:#192128;
+  --panel-2:#222d36;
+  --line:#35424d;
+  --line-soft:#29343e;
+  --ink:#eae6df;
+  --ink-dim:#a0acb5;
+  --ink-faint:#87949f;
+  --accent:#70bdb3;
+  --name:#dfa868;
+  --danger:#d78376;
+  --warn:#dfb767;
+  --ww-serif:Georgia,"Times New Roman",serif;
+  --ww-shadow:0 12px 32px rgba(0,0,0,.18);
+}
+
+body{
+  background:
+    radial-gradient(ellipse at 3% 0%,rgba(223,168,104,.10),transparent 42%),
+    radial-gradient(ellipse at 95% 18%,rgba(112,189,179,.08),transparent 45%),
+    var(--bg);
+}
+
+.shell{
+  height:100vh;
+  height:100dvh;
+}
+
+*{
+  scrollbar-width:thin;
+  scrollbar-color:#43515d transparent;
+}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{
+  background:#43515d;
+  border:2px solid transparent;
+  background-clip:padding-box;
+  border-radius:20px;
+}
+::selection{background:rgba(112,189,179,.26);color:var(--ink)}
+
+/* ---------- header and navigation ---------- */
+
+header{
+  position:relative;
+  padding:16px 22px 12px;
+  gap:14px 20px;
+  background:rgba(20,27,33,.94);
+  border-bottom:1px solid var(--line);
+  box-shadow:0 8px 28px rgba(0,0,0,.12);
+}
+
+.brand{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  font-family:var(--ww-serif);
+  font-size:21px;
+  font-weight:400;
+  letter-spacing:-.035em;
+  white-space:nowrap;
+}
+
+.brand::before{
+  content:"W";
+  display:grid;
+  place-items:center;
+  width:35px;
+  height:35px;
+  flex:none;
+  border:1px solid rgba(223,168,104,.38);
+  border-radius:10px;
+  background:
+    linear-gradient(145deg,rgba(223,168,104,.18),rgba(223,168,104,.03));
+  color:var(--name);
+  font-size:24px;
+  font-style:italic;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+.brand > span{
+  font-family:var(--sans);
+  font-size:11px;
+  letter-spacing:.02em;
+  color:var(--ink-faint);
+}
+
+.namebar{
+  min-width:220px;
+  max-width:360px;
+}
+.namebar label{
+  font-size:10px;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:.12em;
+}
+#charName{
+  min-width:0;
+  padding:9px 12px;
+  border-radius:8px;
+  background:rgba(10,15,20,.65);
+}
+#charName:focus{
+  box-shadow:0 0 0 3px rgba(223,168,104,.10);
+}
+
+.tabs{
+  order:10;
+  flex:0 0 100%;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  gap:5px;
+  padding:5px;
+  overflow-x:auto;
+  background:rgba(8,13,17,.46);
+  border:1px solid var(--line-soft);
+  border-radius:10px;
+  scrollbar-width:thin;
+}
+
+.tab{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  flex:none;
+  padding:9px 13px;
+  border-radius:6px;
+  font-size:12.5px;
+  transition:background .16s,color .16s,box-shadow .16s;
+}
+
+.tab::after{
+  content:"";
+  position:absolute;
+  left:13px;
+  right:13px;
+  bottom:2px;
+  height:2px;
+  border-radius:10px;
+  background:var(--name);
+  opacity:0;
+  transform:scaleX(.6);
+  transition:opacity .16s,transform .16s;
+}
+.tab:hover{
+  background:rgba(255,255,255,.035);
+}
+.tab[aria-selected="true"]{
+  background:linear-gradient(180deg,rgba(223,168,104,.12),rgba(223,168,104,.04));
+  color:#f1d0a6;
+  box-shadow:inset 0 0 0 1px rgba(223,168,104,.13);
+}
+.tab[aria-selected="true"]::after{
+  opacity:1;
+  transform:scaleX(1);
+}
+
+/* Icons use local SVG data, not an external icon library. */
+.ww-has-icon::before{
+  content:"";
+  display:block;
+  width:15px;
+  height:15px;
+  flex:none;
+  background:currentColor;
+  -webkit-mask:var(--ww-icon) center / contain no-repeat;
+  mask:var(--ww-icon) center / contain no-repeat;
+}
+
+.toolbar{gap:7px}
+.btn,.add,.roster-add{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  border-radius:8px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+  transition:
+    background .16s,
+    border-color .16s,
+    box-shadow .16s,
+    transform .16s;
+}
+.btn{
+  padding:8px 11px;
+  font-size:12px;
+  background:linear-gradient(180deg,#26323c,#202a33);
+}
+.btn:hover,.add:hover,.roster-add:hover{
+  box-shadow:0 4px 12px rgba(0,0,0,.15);
+}
+.btn:active,.add:active,.roster-add:active{
+  transform:translateY(0);
+}
+.btn.primary{
+  color:#261c11;
+  border-color:#d5a16a;
+  background:linear-gradient(180deg,#e6b780,#d69d60);
+  box-shadow:0 3px 12px rgba(223,168,104,.12);
+}
+.btn.primary:hover{
+  border-color:#efc999;
+  background:linear-gradient(180deg,#efc48f,#dfa868);
+}
+#btnWipe{
+  background:transparent;
+  color:var(--ink-dim);
+}
+#btnWipe:hover{
+  color:var(--danger);
+  border-color:rgba(215,131,118,.45);
+}
+
+.toolbar #saveStatus{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  color:var(--ink-dim);
+  opacity:1!important;
+  font-size:11px;
+}
+#saveStatus:not(:empty)::before{
+  content:"";
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:var(--ink-faint);
+}
+#saveStatus[data-ww-state="saved"]::before{
+  background:var(--accent);
+  box-shadow:0 0 7px rgba(112,189,179,.30);
+}
+#saveStatus[data-ww-state="warning"]::before{
+  background:var(--warn);
+}
+
+/* ---------- editor and section cards ---------- */
+
+.form{
+  flex:1 1 54%;
+  padding-bottom:36px;
+  background:
+    radial-gradient(ellipse at 0% 30%,rgba(112,189,179,.035),transparent 60%);
+}
+
+.sec{
+  position:relative;
+  margin:10px 16px;
+  overflow:hidden;
+  border:1px solid var(--line-soft);
+  border-radius:11px;
+  background:rgba(25,33,40,.78);
+  box-shadow:0 3px 12px rgba(0,0,0,.07);
+  transition:border-color .16s,box-shadow .16s;
+}
+.sec:hover{border-color:#3d4b57}
+.sec[open]{
+  border-color:#40514f;
+  box-shadow:
+    inset 3px 0 0 rgba(112,189,179,.62),
+    0 8px 22px rgba(0,0,0,.10);
+}
+.sec > summary{
+  padding:15px 18px;
+  gap:11px;
+  font-family:var(--ww-serif);
+  font-size:16px;
+  font-weight:400;
+  line-height:1.35;
+  background:rgba(255,255,255,.015);
+}
+.sec > summary:hover{
+  background:rgba(255,255,255,.035);
+}
+.sec[open] > summary{
+  background:
+    linear-gradient(90deg,rgba(112,189,179,.055),transparent 75%);
+  border-bottom:1px solid rgba(255,255,255,.035);
+}
+.sec > summary::before{
+  width:7px;
+  height:7px;
+  border:0;
+  border-right:1.5px solid var(--ink-faint);
+  border-bottom:1.5px solid var(--ink-faint);
+  transform:rotate(-45deg);
+  transition:transform .16s,border-color .16s;
+}
+.sec[open] > summary::before{
+  transform:rotate(45deg);
+  border-color:var(--accent);
+}
+.sec > summary:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:-3px;
+  border-radius:9px;
+}
+
+.count,.tok{font-size:10px}
+.count{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  white-space:nowrap;
+}
+.count:not(:empty)::before{
+  content:"";
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:var(--accent);
+  opacity:.8;
+}
+
+.body{padding:14px 19px 19px}
+.hint{
+  margin:0 0 15px;
+  color:var(--ink-dim);
+  font-size:12px;
+  line-height:1.6;
+}
+.field{margin-bottom:15px}
+.field label{
+  color:#b7c1c8;
+  font-size:12px;
+  font-weight:500;
+  margin-bottom:6px;
+}
+.field input,.field textarea,.row input,.row textarea{
+  min-width:0;
+  padding:10px 12px;
+  border:1px solid #34414c;
+  border-radius:7px;
+  background:rgba(10,16,21,.66);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.08);
+  transition:border-color .16s,box-shadow .16s,background .16s;
+}
+.field input:hover,.field textarea:hover,
+.row input:hover,.row textarea:hover{
+  border-color:#485965;
+}
+.field input:focus,.field textarea:focus,
+.row input:focus,.row textarea:focus{
+  background:#111b21;
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(112,189,179,.09);
+}
+.field textarea{min-height:90px}
+.row textarea{min-height:68px}
+.field input::placeholder,.field textarea::placeholder,
+.row input::placeholder,.row textarea::placeholder{
+  color:#84939f;
+}
+.row .bullet{
+  padding-top:10px;
+  color:var(--name);
+  opacity:.8;
+}
+.x,.chip-x{
+  min-width:32px;
+  min-height:32px;
+}
+.add{
+  padding:7px 11px;
+  background:rgba(112,189,179,.025);
+  border-color:#3b4c53;
+  font-size:12px;
+}
+button:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:3px;
+}
+
+.lede,.lorebook-bar{
+  margin:12px 16px;
+  padding:12px 15px;
+  border:1px solid var(--line-soft);
+  border-radius:9px;
+  background:rgba(255,255,255,.018);
+}
+.lede{
+  color:var(--ink-dim);
+  border-left:2px solid rgba(223,168,104,.55);
+}
+.lorebook-bar input{
+  border-radius:6px;
+  background:rgba(10,16,21,.55);
+}
+.lorebook-note{color:var(--ink-dim)}
+
+/* ---------- roster identity cards ---------- */
+
+.roster{
+  gap:8px;
+  flex-wrap:nowrap;
+  overflow-x:auto;
+  padding:12px 16px;
+  background:rgba(23,31,38,.96);
+  border-bottom:1px solid var(--line);
+}
+
+.chip{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  grid-template-rows:auto auto;
+  flex:none;
+  min-width:165px;
+  max-width:255px;
+  border-radius:10px;
+  background:linear-gradient(150deg,#202a33,#182129);
+  border-color:#35424e;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+  transition:border-color .16s,background .16s,box-shadow .16s;
+}
+.chip:hover{
+  border-color:#596570;
+}
+.chip.active{
+  border-color:rgba(223,168,104,.70);
+  background:
+    linear-gradient(140deg,rgba(223,168,104,.13),rgba(223,168,104,.025)),
+    #1c252d;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    0 3px 12px rgba(0,0,0,.12);
+}
+.chip-name{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  grid-column:1;
+  grid-row:1 / 3;
+  max-width:none;
+  min-width:0;
+  padding:9px 5px 9px 10px;
+  text-align:left;
+  border-radius:8px;
+}
+.ww-avatar{
+  display:grid;
+  place-items:center;
+  width:34px;
+  height:34px;
+  flex:none;
+  border-radius:9px;
+  border:1px solid var(--line);
+  background:rgba(0,0,0,.19);
+  color:var(--ww-entity,var(--name));
+  font-family:var(--mono);
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:.02em;
+}
+.ww-avatar.ww-has-icon::before{
+  width:18px;
+  height:18px;
+}
+.ww-chip-copy{
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  gap:2px;
+}
+.ww-chip-label{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:12px;
+}
+.ww-chip-kind{
+  color:var(--ink-faint);
+  font-size:9px;
+  font-weight:400;
+  text-transform:uppercase;
+  letter-spacing:.075em;
+}
+.chip-tok{
+  grid-column:2;
+  grid-row:2;
+  align-self:start;
+  padding:0 9px 5px 5px;
+  font-size:9px;
+  text-align:right;
+}
+.chip-x{
+  grid-column:2;
+  grid-row:1;
+  justify-self:end;
+  padding:4px 8px;
+  color:var(--ink-faint);
+}
+.chip-x:hover{color:var(--danger)}
+.roster-add{
+  flex:none;
+  padding:8px 10px;
+  font-size:11px;
+}
+.roster-meta{
+  flex:none;
+  width:auto;
+  font-size:10px;
+  padding-left:5px;
+}
+
+@keyframes ww-arrive{
+  from{opacity:.35;transform:translateY(4px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.ww-chip-new{animation:ww-arrive .18s ease-out}
+
+/* ---------- preview frame ---------- */
+
+.preview{
+  flex:1 1 46%;
+  min-height:0;
+  overflow:hidden;
+  background:
+    radial-gradient(ellipse at 100% 0%,rgba(112,189,179,.055),transparent 60%),
+    #151d24;
+  border-left:1px solid var(--line);
+  box-shadow:inset 12px 0 32px rgba(0,0,0,.045);
+}
+.pv-head{
+  gap:10px;
+  padding:15px 20px;
+  background:rgba(255,255,255,.015);
+}
+#pvTitle{
+  flex:1 1 170px;
+  color:var(--ink);
+  font-family:var(--ww-serif);
+  font-size:16px;
+}
+.ww-live{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  color:var(--accent);
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:.1em;
+}
+.ww-live::before{
+  content:"";
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 0 8px rgba(112,189,179,.28);
+}
+#totalTok{
+  padding:3px 9px;
+  color:var(--ink-dim);
+  background:rgba(0,0,0,.10);
+  font-size:10px;
+}
+#totalTok.heavy{
+  color:var(--ink-dim);
+  border-color:var(--line);
+}
+#totalTok[data-ww-level="near"],
+#totalTok[data-ww-level="over"]{
+  color:var(--warn);
+  border-color:rgba(223,183,103,.4);
+}
+.pv-actions{gap:6px}
+.pv-actions .btn{font-size:11px}
+
+.ww-preview-tools{
+  flex:none;
+  padding:11px 20px 12px;
+  border-bottom:1px solid var(--line-soft);
+  background:rgba(0,0,0,.07);
+}
+.ww-tools-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.ww-view-switch{
+  display:inline-flex;
+  gap:3px;
+  padding:3px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#10171d;
+}
+.ww-view-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:6px 9px;
+  border:0;
+  border-radius:5px;
+  background:transparent;
+  color:var(--ink-dim);
+  font-size:11px;
+  transition:background .15s,color .15s;
+}
+.ww-view-btn[aria-pressed="true"]{
+  color:var(--ink);
+  background:#2a3741;
+  box-shadow:0 1px 4px rgba(0,0,0,.18);
+}
+.ww-view-btn.ww-has-icon::before{
+  width:13px;
+  height:13px;
+}
+.ww-target{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  color:var(--ink-dim);
+  font-size:10px;
+}
+.ww-target input{
+  width:76px;
+  padding:5px 6px;
+  border:1px solid var(--line);
+  border-radius:5px;
+  color:var(--ink);
+  background:#11191f;
+  font-family:var(--mono);
+  font-size:11px;
+}
+.ww-target input:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+}
+.ww-progress-line{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:10px;
+}
+.ww-progress-line progress{
+  appearance:none;
+  -webkit-appearance:none;
+  display:block;
+  flex:1;
+  width:100%;
+  height:4px;
+  overflow:hidden;
+  border:0;
+  border-radius:20px;
+  background:#2a353f;
+  accent-color:var(--accent);
+}
+.ww-progress-line progress::-webkit-progress-bar{
+  background:#2a353f;
+  border-radius:20px;
+}
+.ww-progress-line progress::-webkit-progress-value{
+  background:var(--accent);
+  border-radius:20px;
+}
+.ww-progress-line progress::-moz-progress-bar{
+  background:var(--accent);
+  border-radius:20px;
+}
+.ww-preview-tools[data-level="near"] progress,
+.ww-preview-tools[data-level="over"] progress{
+  accent-color:var(--warn);
+}
+.ww-preview-tools[data-level="near"] progress::-webkit-progress-value,
+.ww-preview-tools[data-level="over"] progress::-webkit-progress-value{
+  background:var(--warn);
+}
+.ww-preview-tools[data-level="near"] progress::-moz-progress-bar,
+.ww-preview-tools[data-level="over"] progress::-moz-progress-bar{
+  background:var(--warn);
+}
+.ww-progress-caption{
+  flex:none;
+  color:var(--ink-faint);
+  font-family:var(--mono);
+  font-size:9px;
+}
+
+pre#out{
+  min-height:0;
+  padding:25px;
+  color:#c4cfd6;
+  font-size:12px;
+  line-height:1.8;
+  tab-size:2;
+}
+pre#out .h{color:#89cbc1}
+pre#out .n{color:#e8b880}
+
+#out[hidden],#ww-readout[hidden]{
+  display:none!important;
+}
+
+/* ---------- safe formatted reading view ---------- */
+
+.ww-reading{
+  flex:1;
+  min-height:0;
+  overflow:auto;
+  padding:30px clamp(20px,4vw,48px) 60px;
+}
+.ww-doc{
+  max-width:70ch;
+  margin:0 auto;
+  color:#c7d0d6;
+  font-size:14px;
+  line-height:1.85;
+  overflow-wrap:anywhere;
+}
+.ww-doc-eyebrow{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin-bottom:13px;
+  color:var(--accent);
+  font-family:var(--mono);
+  font-size:9px;
+  line-height:1.5;
+  letter-spacing:.17em;
+  text-transform:uppercase;
+}
+.ww-doc-eyebrow::before{
+  content:"";
+  width:22px;
+  height:1px;
+  background:var(--accent);
+  opacity:.7;
+}
+.ww-doc-title{
+  margin:0 0 27px;
+  padding-bottom:21px;
+  border-bottom:1px solid rgba(223,168,104,.23);
+  color:#edc496;
+  font-family:var(--ww-serif);
+  font-size:clamp(28px,3vw,39px);
+  font-weight:400;
+  line-height:1.2;
+  letter-spacing:-.035em;
+}
+.ww-doc h2{
+  position:relative;
+  margin:29px 0 12px;
+  padding-left:13px;
+  color:var(--ink);
+  font-family:var(--ww-serif);
+  font-size:20px;
+  font-weight:400;
+  line-height:1.4;
+}
+.ww-doc h2::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:.2em;
+  bottom:.2em;
+  width:2px;
+  border-radius:3px;
+  background:var(--accent);
+  opacity:.7;
+}
+.ww-doc p{
+  margin:0 0 15px;
+  white-space:pre-wrap;
+}
+.ww-doc ul{
+  margin:0 0 18px;
+  padding-left:21px;
+}
+.ww-doc li{
+  padding-left:4px;
+  margin-bottom:7px;
+  white-space:pre-wrap;
+}
+.ww-doc li::marker{color:var(--name)}
+
+.ww-sr-only{
+  position:absolute!important;
+  width:1px;
+  height:1px;
+  padding:0;
+  margin:-1px;
+  overflow:hidden;
+  clip:rect(0,0,0,0);
+  white-space:nowrap;
+  border:0;
+}
+
+/* ---------- credits and feedback ---------- */
+
+.credits-inner{
+  max-width:75ch;
+  padding:40px 36px 70px;
+}
+.credits h1{
+  color:#edc496;
+  font-family:var(--ww-serif);
+  font-size:36px;
+  font-weight:400;
+}
+.cr{
+  padding:19px 21px;
+  border:1px solid var(--line-soft);
+  border-radius:11px;
+  background:rgba(25,33,40,.75);
+  box-shadow:0 4px 15px rgba(0,0,0,.06);
+}
+.cr h2{
+  font-size:11px;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+}
+
+#toast{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  max-width:calc(100vw - 32px);
+  border-radius:12px;
+  padding:12px 18px;
+  background:rgba(32,43,52,.97);
+  border-color:#4a5b67;
+  box-shadow:var(--ww-shadow);
+}
+#toast::before{
+  content:"";
+  width:6px;
+  height:6px;
+  flex:none;
+  border-radius:50%;
+  background:var(--accent);
+}
+
+/* ---------- smaller screens ---------- */
+
+@media(min-width:1500px){
+  .form{flex-basis:51%}
+  .preview{flex-basis:49%}
+  .sec,.lede,.lorebook-bar{margin-left:22px;margin-right:22px}
+}
+
+@media(max-width:900px){
+  .shell{
+    height:auto;
+    min-height:100vh;
+    min-height:100dvh;
+  }
+  header{padding:13px 14px 10px}
+  .split{display:block}
+  .form{
+    overflow:visible;
+    padding-bottom:20px;
+  }
+  .roster{top:0;padding:10px 12px}
+  .roster-meta{width:auto;margin-left:4px}
+  .sec,.lede,.lorebook-bar{margin-left:12px;margin-right:12px}
+  .preview{
+    height:70vh;
+    height:70dvh;
+    min-height:430px;
+    border-left:0;
+    border-top:1px solid var(--line);
+  }
+  .namebar{max-width:none}
+  .toolbar{gap:6px}
+  .tabs{gap:3px}
+  .tab{padding:8px 11px}
+  .pv-head{padding:13px 16px}
+  .ww-preview-tools{padding:10px 16px}
+  .credits-inner{padding:28px 16px 50px}
+}
+
+@media(max-width:520px){
+  .brand{font-size:20px}
+  .brand > span{font-size:10px}
+  .namebar{
+    flex-basis:100%;
+    min-width:0;
+  }
+  .toolbar .btn{padding:7px 9px;font-size:11px}
+  #saveStatus{flex-basis:100%}
+  .sec > summary{padding:14px;font-size:15px}
+  .body{padding:12px 14px 16px}
+  .tok{min-width:36px}
+  .pv-actions{
+    width:100%;
+    margin-left:0;
+    flex-wrap:wrap;
+  }
+  .ww-reading{padding:24px 20px 45px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation:none!important;
+    transition:none!important;
+    scroll-behavior:auto!important;
+  }
+}
+</style>
+
+<script>
+(function(){
+  "use strict";
+
+  const preview = document.querySelector(".preview");
+  const output = document.getElementById("out");
+
+  if(!preview || !output || document.getElementById("ww-readout")) return;
+
+  /* ---------- local SVG icons ---------- */
+
+  const ICONS = {
+    user:
+      '<circle cx="12" cy="8" r="3.5"/>' +
+      '<path d="M5 21v-2a7 7 0 0 1 14 0v2"/>',
+
+    users:
+      '<circle cx="9" cy="8" r="3"/>' +
+      '<path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 4v2"/>',
+
+    compass:
+      '<circle cx="12" cy="12" r="9"/>' +
+      '<path d="m16 8-2.5 5.5L8 16l2.5-5.5L16 8Z"/>',
+
+    pin:
+      '<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/>' +
+      '<circle cx="12" cy="10" r="2.5"/>',
+
+    box:
+      '<path d="m12 3 9 5-9 5-9-5 9-5ZM3 8v9l9 5 9-5V8M12 13v9M7.5 5.5l9 5"/>',
+
+    flag:
+      '<path d="M5 22V3M5 4c5-4 9 4 15 0v11c-6 4-10-4-15 0"/>',
+
+    clock:
+      '<circle cx="12" cy="12" r="9"/>' +
+      '<path d="M12 7v5l3 2"/>',
+
+    book:
+      '<path d="M12 5v16M12 5C8 2 4 3 2 4v15c3-1 6-1 10 2M12 5c4-3 8-2 10-1v15c-3-1-6-1-10 2"/>',
+
+    info:
+      '<circle cx="12" cy="12" r="9"/>' +
+      '<path d="M12 11v6M12 7h.01"/>',
+
+    save:
+      '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z"/>' +
+      '<path d="M7 3v6h10V3M7 21v-8h10v8"/>',
+
+    folder:
+      '<path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2M3 7v12a2 2 0 0 0 2 2h14l3-11H6L3 21"/>',
+
+    eraser:
+      '<path d="m16 3 5 5-11 13H5l-3-3L16 3ZM8 11l7 7M10 21h12"/>',
+
+    reset:
+      '<path d="M3 11a9 9 0 1 1 2 7M3 4v7h7"/>',
+
+    copy:
+      '<rect x="8" y="8" width="13" height="13" rx="2"/>' +
+      '<path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
+
+    download:
+      '<path d="M12 3v12m-5-5 5 5 5-5M3 15v5a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-5"/>',
+
+    plus:
+      '<path d="M12 5v14M5 12h14"/>',
+
+    code:
+      '<path d="m8 5-6 7 6 7m8-14 6 7-6 7m-3-16-2 18"/>'
+  };
+
+  function iconURL(name){
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" ' +
+      'fill="none" stroke="black" stroke-width="1.7" ' +
+      'stroke-linecap="round" stroke-linejoin="round">' +
+      (ICONS[name] || ICONS.book) +
+      '</svg>';
+
+    return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+  }
+
+  function setIcon(element, name){
+    if(!element) return;
+    element.classList.add("ww-has-icon");
+    element.style.setProperty("--ww-icon", iconURL(name));
+  }
+
+  function node(tag, className, text){
+    const element = document.createElement(tag);
+    if(className) element.className = className;
+    if(text !== undefined) element.textContent = text;
+    return element;
+  }
+
+  const KINDS = {
+    main:     {label:"Main character", icon:"user",    color:"#dfa868", heading:"Character dossier"},
+    side:     {label:"Side character", icon:"users",   color:"#70bdb3", heading:"Supporting cast"},
+    scenario: {label:"Scenario",       icon:"compass", color:"#b8a1d5", heading:"Scenario brief"},
+    location: {label:"Location",       icon:"pin",     color:"#7ab9cc", heading:"Location archive"},
+    item:     {label:"Item",           icon:"box",     color:"#d5ba7b", heading:"Object record"},
+    faction:  {label:"Faction",        icon:"flag",    color:"#d3978c", heading:"Faction archive"},
+    history:  {label:"History",        icon:"clock",   color:"#c2a18b", heading:"Historical record"},
+    concept:  {label:"Concept",        icon:"book",    color:"#aaaee0", heading:"Worldbuilding notes"},
+    guide:    {label:"Guide",          icon:"book",    color:"#a0acb5", heading:"Field manual"},
+    credits:  {label:"Credits",        icon:"info",    color:"#a0acb5", heading:"Credits"}
+  };
+
+  document.querySelectorAll(".tab").forEach(tab=>{
+    setIcon(tab, (KINDS[tab.dataset.mode] || KINDS.concept).icon);
+  });
+
+  const actionIcons = {
+    btnSave:"save",
+    btnLoad:"folder",
+    btnClear:"eraser",
+    btnWipe:"reset",
+    btnCopy:"copy",
+    btnAll:"download",
+    btnMd:"download"
+  };
+
+  Object.keys(actionIcons).forEach(id=>{
+    setIcon(document.getElementById(id), actionIcons[id]);
+  });
+
+  document.querySelectorAll(".add").forEach(button=>{
+    setIcon(button, "plus");
+  });
+
+  /* ---------- roster decorations ----------
+     Observe only each roster's immediate children.
+     The original app can keep rebuilding the roster normally.
+  */
+
+  const rosterCounts = new WeakMap();
+
+  function initials(name){
+    const words = name.trim().split(/\s+/).filter(Boolean);
+    if(!words.length || name === "Untitled") return "?";
+
+    if(words.length === 1){
+      return Array.from(words[0]).slice(0,2).join("").toUpperCase();
+    }
+
+    return (
+      Array.from(words[0])[0] +
+      Array.from(words[words.length - 1])[0]
+    ).toUpperCase();
+  }
+
+  function decorateRoster(roster){
+    const kind = roster.id.replace("roster-", "");
+    const config = KINDS[kind] || KINDS.concept;
+
+    roster.style.setProperty("--ww-entity", config.color);
+
+    const chips = Array.from(roster.querySelectorAll(".chip"));
+    const previousCount = rosterCounts.get(roster);
+
+    chips.forEach(chip=>{
+      const button = chip.querySelector(".chip-name");
+      if(!button || button.dataset.wwDecorated) return;
+
+      const name = button.textContent;
+      const avatar = node("span", "ww-avatar");
+      avatar.setAttribute("aria-hidden", "true");
+
+      if(kind === "main" || kind === "side"){
+        avatar.textContent = initials(name);
+      }else{
+        setIcon(avatar, config.icon);
+      }
+
+      const copy = node("span", "ww-chip-copy");
+      copy.append(
+        node("span", "ww-chip-label", name),
+        node("span", "ww-chip-kind", config.label)
+      );
+
+      button.replaceChildren(avatar, copy);
+      button.title = "Switch to " + name;
+      button.dataset.wwDecorated = "1";
+    });
+
+    roster.querySelectorAll(".roster-add").forEach(button=>{
+      setIcon(
+        button,
+        button.textContent.toLowerCase().includes("duplicate") ? "copy" : "plus"
+      );
+    });
+
+    if(previousCount > 0 && chips.length > previousCount){
+      const active = roster.querySelector(".chip.active");
+      if(active) active.classList.add("ww-chip-new");
+    }
+
+    rosterCounts.set(roster, chips.length);
+  }
+
+  document.querySelectorAll(".roster").forEach(roster=>{
+    decorateRoster(roster);
+
+    const observer = new MutationObserver(()=>{
+      decorateRoster(roster);
+    });
+
+    observer.observe(roster, {childList:true});
+  });
+
+  /* ---------- cosmetic preferences ----------
+     Stored separately from the workbench's writing data.
+  */
+
+  const PREF_KEY = "writers-workbench-visuals-v1";
+  let prefs = {};
+
+  try{
+    const saved = JSON.parse(localStorage.getItem(PREF_KEY) || "{}");
+    if(saved && typeof saved === "object" && !Array.isArray(saved)){
+      prefs = saved;
+    }
+  }catch(_){}
+
+  function savePrefs(){
+    try{
+      localStorage.setItem(PREF_KEY, JSON.stringify(prefs));
+    }catch(_){}
+  }
+
+  function validTarget(value){
+    if(value === "" || value === null || value === undefined) return null;
+    const number = Number(value);
+    if(!Number.isFinite(number) || number < 100) return null;
+    return Math.min(200000, Math.round(number));
+  }
+
+  /* ---------- preview controls ---------- */
+
+  const previewHead = preview.querySelector(".pv-head");
+  const live = node("span", "ww-live", "LIVE");
+  live.title = "Updates as you write";
+  if(previewHead) previewHead.prepend(live);
+
+  const tools = node("div", "ww-preview-tools");
+  const toolsRow = node("div", "ww-tools-row");
+
+  const viewSwitch = node("div", "ww-view-switch");
+  viewSwitch.setAttribute("role", "group");
+  viewSwitch.setAttribute("aria-label", "Preview display");
+
+  const readButton = node("button", "ww-view-btn", "Reading");
+  readButton.type = "button";
+  setIcon(readButton, "book");
+
+  const rawButton = node("button", "ww-view-btn", "Raw Markdown");
+  rawButton.type = "button";
+  setIcon(rawButton, "code");
+
+  viewSwitch.append(readButton, rawButton);
+
+  const targetLabel = node("label", "ww-target");
+  targetLabel.htmlFor = "ww-token-target";
+  targetLabel.append(node("span", "", "Token budget"));
+
+  const targetInput = node("input");
+  targetInput.id = "ww-token-target";
+  targetInput.type = "number";
+  targetInput.min = "100";
+  targetInput.max = "200000";
+  targetInput.step = "100";
+  const savedTarget = validTarget(prefs.target);
+  targetInput.value = savedTarget === null ? "" : String(savedTarget);
+  targetInput.placeholder = "optional";
+  targetInput.setAttribute("aria-describedby", "ww-target-help");
+  targetLabel.append(targetInput);
+
+  const help = node(
+    "span",
+    "ww-sr-only",
+    "An optional personal budget for this card, not a model limit. Token counts are estimates."
+  );
+  help.id = "ww-target-help";
+
+  toolsRow.append(viewSwitch, targetLabel);
+
+  const progressLine = node("div", "ww-progress-line");
+  const progress = node("progress");
+  progress.setAttribute(
+    "aria-label",
+    "Estimated card tokens compared with your writing target"
+  );
+
+  const progressCaption = node("span", "ww-progress-caption");
+  progressLine.append(progress, progressCaption);
+
+  tools.append(toolsRow, progressLine, help);
+  preview.insertBefore(tools, output);
+
+  const reader = node("div", "ww-reading");
+  reader.id = "ww-readout";
+  reader.setAttribute("role", "region");
+  reader.setAttribute("aria-label", "Formatted card preview");
+  reader.tabIndex = 0;
+  output.insertAdjacentElement("afterend", reader);
+
+  /* ---------- lightweight, safe Markdown reading view ----------
+     Handles the headings, paragraphs, and bullet lists emitted
+     by this workbench. User writing is inserted as text, not HTML.
+     Exported Markdown is never modified.
+  */
+
+  function renderReading(text){
+    const scrollPosition = reader.scrollTop;
+    const lines = text.replace(/\r\n?/g, "\n").split("\n");
+
+    while(lines.length && !lines[0].trim()) lines.shift();
+    while(lines.length && !lines[lines.length - 1].trim()) lines.pop();
+
+    // Hide only the outer XML-like wrapper in Reading mode.
+    // The original wrapper remains in Raw mode and every export.
+    if(
+      lines.length >= 2 &&
+      /^<[^<>]+>$/.test(lines[0].trim()) &&
+      /^<\/[^<>]+>$/.test(lines[lines.length - 1].trim())
+    ){
+      lines.shift();
+      lines.pop();
+    }
+
+    const selectedTab = document.querySelector('.tab[aria-selected="true"]');
+    const kind = selectedTab ? selectedTab.dataset.mode : "main";
+    const config = KINDS[kind] || KINDS.main;
+
+    const documentBody = node("article", "ww-doc");
+    documentBody.append(node("div", "ww-doc-eyebrow", config.heading));
+
+    // Title: the name field, or a sensible fallback for the scenario tab.
+    const nameField = document.getElementById("charName");
+    const title = kind === "scenario"
+      ? "Scenario"
+      : ((nameField && nameField.value.trim()) || "[Name]");
+    documentBody.append(node("h1", "ww-doc-title", title));
+
+    let hasTitle = true;
+    let sectionDepth = 0;
+    let paragraph = [];
+    let list = null;
+    let lastListItem = null;
+
+    function flushParagraph(){
+      if(!paragraph.length) return;
+      documentBody.append(node("p", "", paragraph.join("\n")));
+      paragraph = [];
+    }
+
+    lines.forEach(line=>{
+      if(!line.trim()){
+        flushParagraph();
+        list = null;
+        lastListItem = null;
+        return;
+      }
+
+      const closeTag = line.match(/^<\/[A-Za-z0-9_.\-]+>$/);
+      if(closeTag){
+        flushParagraph();
+        list = null;
+        lastListItem = null;
+        sectionDepth = Math.max(0, sectionDepth - 1);
+        return;
+      }
+      const openTag = line.match(/^<([A-Za-z0-9.\-]+)_([A-Za-z0-9_]+)>$/);
+      if(openTag){
+        flushParagraph();
+        list = null;
+        lastListItem = null;
+        sectionDepth += 1;
+        const NICE = { likes_dislikes_fears:"Likes, Dislikes & Fears", ways_in_and_out:"Ways In and Out",
+                       rules_and_dangers:"Rules & Dangers", rules_and_code:"Rules & Code", rules_and_limits:"Rules & Limits",
+                       rivals_and_allies:"Rivals & Allies", limits_and_costs:"Limits & Costs", whats_normal:"What's Normal Here",
+                       whos_here:"Who's Usually Here", how_its_used:"How It's Used", body:"Body & Intimate Details" };
+        const label = NICE[openTag[2]] || openTag[2].replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+          .replace(/\bAnd\b/g, "and").replace(/\bOn\b/g, "on").replace(/\bIn\b/g, "in").replace(/\bIt\b/g, "It");
+        documentBody.append(node("h2", "", label));
+        return;
+      }
+
+      const heading = line.match(/^#{1,6}\s+(.+)$/);
+
+      if(heading){
+        flushParagraph();
+        list = null;
+        lastListItem = null;
+
+        if(!hasTitle){
+          documentBody.append(node("h1", "ww-doc-title", heading[1]));
+          hasTitle = true;
+        }else{
+          documentBody.append(node("h2", "", heading[1]));
+        }
+        return;
+      }
+
+      const bullet = line.match(/^\s*[-*]\s+(.*)$/);
+
+      if(bullet){
+        flushParagraph();
+
+        if(!list){
+          list = node("ul");
+          documentBody.append(list);
+        }
+
+        lastListItem = node("li", "", bullet[1]);
+        list.append(lastListItem);
+        return;
+      }
+
+      if(list && lastListItem && /^\s{2,}\S/.test(line)){
+        lastListItem.append(document.createTextNode("\n" + line.trim()));
+        return;
+      }
+
+      list = null;
+      lastListItem = null;
+      paragraph.push(line);
+    });
+
+    flushParagraph();
+    reader.replaceChildren(documentBody);
+    reader.scrollTop = scrollPosition;
+  }
+
+  function estimateTokens(text){
+    if(typeof window.wwEstTokens === "function") return window.wwEstTokens(text);
+    if(!text) return 0;
+    const words = (text.match(/\S+/g) || []).length;
+    return Math.max(Math.round(text.length / 4), Math.round(words * 1.15));
+  }
+
+  function updateMeter(text){
+    const estimated = estimateTokens(text);
+    const target = validTarget(targetInput.value);
+
+    if(target === null){
+      progress.hidden = true;
+      progressCaption.textContent = "~" + estimated + " tokens";
+      tools.dataset.level = "normal";
+      const badge = document.getElementById("totalTok");
+      if(badge) badge.dataset.wwLevel = "normal";
+      return;
+    }
+    progress.hidden = false;
+
+    const ratio = estimated / target;
+    const level = ratio >= 1 ? "over" : ratio >= .85 ? "near" : "normal";
+
+    progress.max = target;
+    progress.value = Math.min(estimated, target);
+    progress.title = "~" + estimated + " tokens / " + target + " budget";
+
+    progressCaption.textContent = Math.round(ratio * 100) + "% of budget";
+    tools.dataset.level = level;
+
+    const totalBadge = document.getElementById("totalTok");
+    if(totalBadge) totalBadge.dataset.wwLevel = level;
+  }
+
+  let currentView = prefs.view === "reading" ? "reading" : "raw";
+
+  function setView(view, remember){
+    currentView = view;
+
+    output.hidden = view !== "raw";
+    reader.hidden = view === "raw";
+
+    readButton.setAttribute("aria-pressed", String(view === "reading"));
+    rawButton.setAttribute("aria-pressed", String(view === "raw"));
+
+    if(view === "reading"){
+      renderReading(output.textContent);
+    }
+
+    if(remember){
+      prefs.view = view;
+      savePrefs();
+    }
+  }
+
+  readButton.addEventListener("click", ()=>setView("reading", true));
+  rawButton.addEventListener("click", ()=>setView("raw", true));
+
+  targetInput.addEventListener("input", ()=>{
+    updateMeter(output.textContent);
+  });
+
+  targetInput.addEventListener("change", ()=>{
+    const v = validTarget(targetInput.value);
+    targetInput.value = v === null ? "" : String(v);
+    prefs.target = v;
+    savePrefs();
+    updateMeter(output.textContent);
+  });
+
+  /* Keep the additional preview synchronized with the original app.
+     Updates are batched to one per animation frame. */
+
+  let previewFrame = 0;
+
+  function schedulePreview(){
+    if(previewFrame) return;
+
+    previewFrame = requestAnimationFrame(()=>{
+      previewFrame = 0;
+      const text = output.textContent;
+
+      updateMeter(text);
+
+      if(currentView === "reading"){
+        renderReading(text);
+      }
+    });
+  }
+
+  const outputObserver = new MutationObserver(schedulePreview);
+  outputObserver.observe(output, {
+    childList:true,
+    subtree:true,
+    characterData:true
+  });
+
+  /* ---------- clearer local-save feedback ---------- */
+
+  const saveStatus = document.getElementById("saveStatus");
+
+  if(saveStatus){
+    saveStatus.title =
+      "Browser autosave status. Download a JSON backup to keep a separate copy.";
+
+    function updateSaveStatus(){
+      const text = saveStatus.textContent;
+
+      if(/^Saved \d/.test(text)){
+        saveStatus.textContent = text.replace(/^Saved /, "Saved locally ");
+      }
+
+      const current = saveStatus.textContent.toLowerCase();
+
+      saveStatus.dataset.wwState =
+        /failed|full|off/.test(current) ? "warning" :
+        /saved|autosave on/.test(current) ? "saved" :
+        "neutral";
+    }
+
+    const saveObserver = new MutationObserver(updateSaveStatus);
+    saveObserver.observe(saveStatus, {
+      childList:true,
+      characterData:true,
+      subtree:true
+    });
+
+    updateSaveStatus();
+  }
+
+  const toast = document.getElementById("toast");
+  if(toast){
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
+    toast.setAttribute("aria-atomic", "true");
+  }
+
+  setView(currentView, false);
+  updateMeter(output.textContent);
+})();
+</script>
+<!-- ================= END VISUAL UPGRADE ================= -->
+
+</body>
+</html>
