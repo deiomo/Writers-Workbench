@@ -42,7 +42,7 @@ Concepts: magic systems, laws, customs, species, anything else
 
 -Example dialogue writing prompts to help you brainstorm dialogue for main and side characters
 
--13 prompts covering moods and situations: good mood, bad news, angered, small talk, bumped into by a stranger, complimented, asked to do something they don't want, caught in a lie, meeting someone new, someone they care about threatened, asked about their past, flirted with, under real pressure.   
+- 13 prompts covering moods and situations: good mood, bad news, angered, small talk, bumped into by a stranger, complimented, asked to do something they don't want, caught in a lie, meeting someone new, someone they care about threatened, asked about their past, flirted with, under real pressure.   
 
 - 5 prompts. Meeting {{user}}, {{user}} wants something, {{user}} has annoyed them, talking about their own work, something goes wrong in front of them.
 
