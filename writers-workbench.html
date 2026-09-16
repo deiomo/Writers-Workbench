@@ -1269,7 +1269,7 @@ Ly must not suspect Mara without finding evidence.</pre>
       <div class="pv-actions">
         <button class="btn" id="btnCopy">Copy</button>
         <button class="btn" id="btnAll" hidden>Download lorebook .json</button>
-        <button class="btn" id="btnCard" hidden>Download SillyTavern Character Card v3.json</button>
+        <button class="btn" id="btnStv3ExportCharCard" hidden>Download ST Char. Card v3.json</button>
         <button class="btn primary" id="btnMd">Download .md</button>
       </div>
     </div>
@@ -1854,14 +1854,14 @@ function setMode(next){
   $(".namebar").hidden      = isStatic || next==="scenario";
   $(".toolbar").hidden      = isStatic;
   $("#btnAll").hidden       = isStatic;
-  $("#btnCard").hidden      = isStatic;
+  $("#btnStv3ExportCharCard").hidden      = isStatic;
   if(isStatic) return;
   mode = next;
   $("#pvTitle").textContent = ({main:"Markdown output", side:"Markdown output — side card", scenario:"Markdown output — scenario", location:"Markdown output — location", item:"Markdown output — item", faction:"Markdown output — faction", history:"Markdown output — event", concept:"Markdown output — concept"})[mode];
   nameInput.placeholder = ({main:"main character name…", side:"side character name…", scenario:"scenario name…", location:"location name…", item:"item name…", faction:"faction name…", history:"event name…", concept:"concept name…"})[mode];
   $("#btnAll").hidden = false;
   $("#btnAll").textContent = (mode==="scenario" ? "Download lorebook .json (constant)" : "Download lorebook .json");
-  $("#btnCard").hidden = (mode!=="main" && mode!=="side");
+  $("#btnStv3ExportCharCard").hidden = (mode!=="main" && mode!=="side");
   $("#btnClear").textContent = "Clear this one";
   hydrate();
 }
@@ -1930,11 +1930,12 @@ function download(text, filename, mime){
    personality / scenario by section suffix, and the "Example Dialogue:"
    block of the voice section becomes mes_example (<START> before each
    example, ST convention). Runs in-browser on build() output. */
-function parseName(md, fallback){
+function stV3CharCardParseName(md, fallback){
   const m = md.match(/^\s*Name:\s*(.+)$/m);
   return m ? m[1].trim() : fallback;
 }
-function parseTags(md){
+
+function stV3CharCardParseTags(md){
   const m = md.match(/<[^>\n]+_personality>([\s\S]*?)<\/[^>\n]+_personality>/);
   if(!m) return [];
   const tags = [];
@@ -1944,7 +1945,8 @@ function parseTags(md){
   }
   return tags;
 }
-function splitVoice(md){
+
+function stV3CharCardSplitVoice(md) {
   const m = md.match(/<([^\n>]+)_voice>([\s\S]*?)<\/\1_voice>/);
   if(!m) return {md, mesExample: null};
   const inner = m[2];
@@ -1972,7 +1974,8 @@ function splitVoice(md){
 }
 const SCENARIO_SUFFIXES = new Set(["current_status"]);
 const PERSONALITY_SUFFIXES = new Set(["personality","psychology","core_contradiction","intimacy","hobbies","likes_dislikes_fears","quirks","personal_goal","voice"]);
-function splitSections(md){
+
+function stV3CharCardSplitSections(md) {
   const wrapper = md.match(/^<([^\n>]+)>([\s\S]*)<\/\1>\s*$/);
   const inner = wrapper ? wrapper[2] : md;
   const prefix = wrapper ? wrapper[1] : (inner.match(/<([^\n>]+)_/) || [null, ""])[1];
@@ -2004,10 +2007,11 @@ function splitSections(md){
     scenario: buckets.scenario.join("\n\n")
   };
 }
-function buildCharCard(md, name, firstMsg){
-  const {md: md2, mesExample} = splitVoice(md);
-  const {description, personality, scenario} = splitSections(md2);
-  const tags = parseTags(md2);
+
+function stV3BuildCharCard(md, name, firstMsg){
+  const {md: md2, mesExample} = stV3CharCardSplitVoice(md);
+  const {description, personality, scenario} = stV3CharCardSplitSections(md2);
+  const tags = stV3CharCardParseTags(md2);
   const ex = mesExample ?? "";
   const fm = (firstMsg||"").trim();
   return {
@@ -2066,10 +2070,10 @@ $("#btnMd").addEventListener("click", ()=>{
   toast("Downloaded "+slug()+".md");
 });
 
-$("#btnCard").addEventListener("click", ()=>{
+$("#btnStv3ExportCharCard").addEventListener("click", ()=>{
   const md = build();
-  const name = parseName(md, (cur().name && cur().name!=="[Name]") ? cur().name : slug());
-  const card = buildCharCard(md, name, cur().fields.firstMsg);
+  const name = stV3CharCardParseName(md, (cur().name && cur().name!=="[Name]") ? cur().name : slug());
+  const card = stV3BuildCharCard(md, name, cur().fields.firstMsg);
   const fname = slug()+"-card.json";
   download(JSON.stringify(card,null,4), fname, "application/json");
   toast("Downloaded "+fname);
@@ -3509,7 +3513,7 @@ pre#out .n{color:#e8b880}
     btnWipe:"reset",
     btnCopy:"copy",
     btnAll:"download",
-    btnCard:"download",
+    btnStv3ExportCharCard:"download",
     btnMd:"download"
   };
 
