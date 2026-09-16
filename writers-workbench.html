@@ -1925,11 +1925,6 @@ function download(text, filename, mime){
   setTimeout(()=>URL.revokeObjectURL(url), 1000);
 }
 
-/* ---- SillyTavern chara_card_v3 export ----
-   Same pipeline as ww2st.mjs: the .md is split into description /
-   personality / scenario by section suffix, and the "Example Dialogue:"
-   block of the voice section becomes mes_example (<START> before each
-   example, ST convention). Runs in-browser on build() output. */
 function stV3CharCardParseName(md, fallback){
   const m = md.match(/^\s*Name:\s*(.+)$/m);
   return m ? m[1].trim() : fallback;
