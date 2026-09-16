@@ -469,6 +469,7 @@ pre#out .h{color:var(--accent)}
         <div class="field" style="margin-top:4px"><label>Other lines</label></div>
         <div class="rows" data-list="dialogue"></div>
         <button class="add" data-add="dialogue">+ Add line</button>
+        <div class="field" style="margin-top:12px"><label>Message example</label><textarea data-k="firstMsg" placeholder="The card's first message (first_mes in the char v3 .json). Not part of the .md export."></textarea></div>
       </div>
     </details>
 
@@ -586,6 +587,7 @@ pre#out .h{color:var(--accent)}
         <div class="field" style="margin-top:4px"><label>Other lines</label></div>
         <div class="rows" data-list="dialogue"></div>
         <button class="add" data-add="dialogue">+ Add line</button>
+        <div class="field" style="margin-top:12px"><label>Message example</label><textarea data-k="firstMsg" placeholder="The card's first message (first_mes in the char v3 .json). Not part of the .md export."></textarea></div>
       </div>
     </details>
 
@@ -1267,6 +1269,7 @@ Ly must not suspect Mara without finding evidence.</pre>
       <div class="pv-actions">
         <button class="btn" id="btnCopy">Copy</button>
         <button class="btn" id="btnAll" hidden>Download lorebook .json</button>
+        <button class="btn" id="btnCard" hidden>Download SillyTavern Character Card v3.json</button>
         <button class="btn primary" id="btnMd">Download .md</button>
       </div>
     </div>
@@ -1851,12 +1854,14 @@ function setMode(next){
   $(".namebar").hidden      = isStatic || next==="scenario";
   $(".toolbar").hidden      = isStatic;
   $("#btnAll").hidden       = isStatic;
+  $("#btnCard").hidden      = isStatic;
   if(isStatic) return;
   mode = next;
   $("#pvTitle").textContent = ({main:"Markdown output", side:"Markdown output — side card", scenario:"Markdown output — scenario", location:"Markdown output — location", item:"Markdown output — item", faction:"Markdown output — faction", history:"Markdown output — event", concept:"Markdown output — concept"})[mode];
   nameInput.placeholder = ({main:"main character name…", side:"side character name…", scenario:"scenario name…", location:"location name…", item:"item name…", faction:"faction name…", history:"event name…", concept:"concept name…"})[mode];
   $("#btnAll").hidden = false;
   $("#btnAll").textContent = (mode==="scenario" ? "Download lorebook .json (constant)" : "Download lorebook .json");
+  $("#btnCard").hidden = (mode!=="main" && mode!=="side");
   $("#btnClear").textContent = "Clear this one";
   hydrate();
 }
@@ -1920,6 +1925,130 @@ function download(text, filename, mime){
   setTimeout(()=>URL.revokeObjectURL(url), 1000);
 }
 
+/* ---- SillyTavern chara_card_v3 export ----
+   Same pipeline as ww2st.mjs: the .md is split into description /
+   personality / scenario by section suffix, and the "Example Dialogue:"
+   block of the voice section becomes mes_example (<START> before each
+   example, ST convention). Runs in-browser on build() output. */
+function parseName(md, fallback){
+  const m = md.match(/^\s*Name:\s*(.+)$/m);
+  return m ? m[1].trim() : fallback;
+}
+function parseTags(md){
+  const m = md.match(/<[^>\n]+_personality>([\s\S]*?)<\/[^>\n]+_personality>/);
+  if(!m) return [];
+  const tags = [];
+  for(const line of m[1].split("\n")){
+    const t = line.trim();
+    if(t.startsWith("- ")) tags.push(t.slice(2).trim());
+  }
+  return tags;
+}
+function splitVoice(md){
+  const m = md.match(/<([^\n>]+)_voice>([\s\S]*?)<\/\1_voice>/);
+  if(!m) return {md, mesExample: null};
+  const inner = m[2];
+  const marker = "Example Dialogue:";
+  const idx = inner.indexOf(marker);
+  let head = inner;
+  let examples = [];
+  if(idx >= 0){
+    head = inner.slice(0, idx);
+    const body = inner.slice(idx + marker.length);
+    const chunks = body.split(/\n(?=- )/);
+    examples = chunks
+      .map((c)=>c.replace(/^\n+/,"").replace(/^-\s/,"").trim())
+      .filter(Boolean);
+  }
+  let newMd = md;
+  const trimmedHead = head.trim();
+  if(trimmedHead) newMd = newMd.replace(m[0], `<${m[1]}_voice>\n${trimmedHead}\n</${m[1]}_voice>`);
+  else newMd = newMd.replace(m[0], "");
+  newMd = newMd.replace(/\n{3,}/g, "\n\n").trim();
+  const mesExample = examples.length
+    ? examples.map((e)=>`<START>\r\n${e}`).join("\r\n\r\n")
+    : null;
+  return {md: newMd, mesExample};
+}
+const SCENARIO_SUFFIXES = new Set(["current_status"]);
+const PERSONALITY_SUFFIXES = new Set(["personality","psychology","core_contradiction","intimacy","hobbies","likes_dislikes_fears","quirks","personal_goal","voice"]);
+function splitSections(md){
+  const wrapper = md.match(/^<([^\n>]+)>([\s\S]*)<\/\1>\s*$/);
+  const inner = wrapper ? wrapper[2] : md;
+  const prefix = wrapper ? wrapper[1] : (inner.match(/<([^\n>]+)_/) || [null, ""])[1];
+  const buckets = {description: [], personality: [], scenario: []};
+  const leftovers = [];
+  const re = /<([^\n>]+)>([\s\S]*?)<\/\1>/g;
+  let m;
+  let lastEnd = 0;
+  while((m = re.exec(inner))){
+    if(m.index > lastEnd){
+      const gap = inner.slice(lastEnd, m.index).trim();
+      if(gap) leftovers.push(gap);
+    }
+    const secName = m[1];
+    const suffix = secName.startsWith(prefix + "_") ? secName.slice(prefix.length + 1) : secName.split("_").pop();
+    if(SCENARIO_SUFFIXES.has(suffix)) buckets.scenario.push(m[0].trim());
+    else if(PERSONALITY_SUFFIXES.has(suffix)) buckets.personality.push(m[0].trim());
+    else buckets.description.push(m[0].trim());
+    lastEnd = m.index + m[0].length;
+  }
+  if(lastEnd < inner.length){
+    const gap = inner.slice(lastEnd).trim();
+    if(gap) leftovers.push(gap);
+  }
+  if(leftovers.length) buckets.description.push(leftovers.join("\n\n"));
+  return {
+    description: buckets.description.join("\n\n"),
+    personality: buckets.personality.join("\n\n"),
+    scenario: buckets.scenario.join("\n\n")
+  };
+}
+function buildCharCard(md, name, firstMsg){
+  const {md: md2, mesExample} = splitVoice(md);
+  const {description, personality, scenario} = splitSections(md2);
+  const tags = parseTags(md2);
+  const ex = mesExample ?? "";
+  const fm = (firstMsg||"").trim();
+  return {
+    name,
+    description,
+    personality,
+    scenario,
+    first_mes: fm,
+    mes_example: ex,
+    creatorcomment: "",
+    avatar: "none",
+    talkativeness: "0.5",
+    fav: false,
+    tags,
+    spec: "chara_card_v3",
+    spec_version: "3.0",
+    data: {
+      name,
+      description,
+      personality,
+      scenario,
+      first_mes: fm,
+      mes_example: ex,
+      creator_notes: "",
+      system_prompt: "",
+      post_history_instructions: "",
+      tags,
+      creator: "",
+      character_version: "",
+      alternate_greetings: [],
+      extensions: {
+        talkativeness: "0.5",
+        fav: false,
+        world: "",
+        depth_prompt: {prompt: "", depth: 4, role: "system"}
+      }
+    },
+    create_date: new Date().toISOString()
+  };
+}
+
 $("#btnCopy").addEventListener("click", async ()=>{
   const md = build();
   try{ await navigator.clipboard.writeText(md); toast("Copied to clipboard"); }
@@ -1935,6 +2064,15 @@ $("#btnCopy").addEventListener("click", async ()=>{
 $("#btnMd").addEventListener("click", ()=>{
   download(build(), slug()+".md", "text/markdown");
   toast("Downloaded "+slug()+".md");
+});
+
+$("#btnCard").addEventListener("click", ()=>{
+  const md = build();
+  const name = parseName(md, (cur().name && cur().name!=="[Name]") ? cur().name : slug());
+  const card = buildCharCard(md, name, cur().fields.firstMsg);
+  const fname = slug()+"-card.json";
+  download(JSON.stringify(card,null,4), fname, "application/json");
+  toast("Downloaded "+fname);
 });
 
 /* ---- SillyTavern World Info export ----
@@ -3371,6 +3509,7 @@ pre#out .n{color:#e8b880}
     btnWipe:"reset",
     btnCopy:"copy",
     btnAll:"download",
+    btnCard:"download",
     btnMd:"download"
   };
 
