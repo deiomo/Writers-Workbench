@@ -24,8 +24,10 @@ header{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 22px
 .brand{font-weight:600;letter-spacing:-0.01em;font-size:15px}
 .brand span{color:var(--ink-faint);font-weight:400}
 
-.tabs{display:flex;gap:2px;background:var(--bg);padding:3px;border-radius:5px;border:1px solid var(--line)}
-.tab{background:none;border:none;color:var(--ink-dim);padding:6px 14px;border-radius:3px;transition:background .12s,color .12s;white-space:nowrap}
+.tabs{display:flex;gap:2px;background:var(--bg);padding:3px;border-radius:5px;border:1px solid var(--line);max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{height:6px}
+.tabs::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.tab{background:none;border:none;color:var(--ink-dim);padding:6px 14px;border-radius:3px;transition:background .12s,color .12s;white-space:nowrap;flex:none}
 .tab:hover{color:var(--ink)}
 .tab[aria-selected="true"]{background:var(--panel-2);color:var(--ink);font-weight:500}
 .tab:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
@@ -382,6 +384,7 @@ pre#out .h{color:var(--accent)}
 
 <header>
   <div class="brand">Writer's Workbench <span>/ SillyTavern</span></div>
+  <button class="btn theme-toggle" id="themeToggle" type="button" aria-pressed="false" title="Switch to paper (light) theme"><span class="t-icon" aria-hidden="true">◐</span> <span class="t-label">Paper</span></button>
   <div class="projectbar" aria-label="Project controls">
     <span class="project-label">Project</span>
     <select id="projectSelect" aria-label="Current Writer's Workbench project"></select>
@@ -2338,6 +2341,36 @@ function setMode(next){
   hydrate();
 }
 $$(".tab").forEach(t=> t.addEventListener("click", ()=> setMode(t.dataset.mode)));
+
+/* ---------- tab bar: keep active tab visible + scroll-hint fade (mobile) ---------- */
+(function(){
+  const bar = document.querySelector(".tabs");
+  if(!bar) return;
+  const active = ()=> bar.querySelector('.tab[aria-selected="true"]');
+  function syncFade(){
+    bar.classList.toggle("at-end", bar.scrollLeft + bar.clientWidth >= bar.scrollWidth - 8);
+    bar.classList.toggle("at-start", bar.scrollLeft <= 8);
+  }
+  function reveal(){
+    const el = active();
+    if(!el) { syncFade(); return; }
+    // Bar-only scroll: center the active tab without moving the page
+    // (scrollIntoView would also scroll scrollable ancestors vertically).
+    const target = Math.max(0, Math.min(
+      bar.scrollWidth - bar.clientWidth,
+      el.offsetLeft - (bar.clientWidth - el.offsetWidth) / 2
+    ));
+    const fullyVisible = el.offsetLeft >= bar.scrollLeft + 1 &&
+      (el.offsetLeft + el.offsetWidth) <= (bar.scrollLeft + bar.clientWidth - 1);
+    if(!fullyVisible) bar.scrollTo({left: target, behavior: "smooth"});
+    syncFade();
+  }
+  bar.addEventListener("scroll", syncFade, {passive:true});
+  window.addEventListener("resize", syncFade);
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(syncFade);
+  new MutationObserver(reveal).observe(bar, {attributes:true, subtree:true, attributeFilter:["aria-selected"]});
+  requestAnimationFrame(()=>{ reveal(); setTimeout(syncFade, 300); });
+})();
 
 /* ================= wiring ================= */
 nameInput.addEventListener("input", e=>{ cur().name = e.target.value; render(); });
@@ -4865,6 +4898,19 @@ header{
   box-shadow:0 8px 28px rgba(0,0,0,.12);
 }
 
+/* ---------- theme toggle: pinned top-right of the header ---------- */
+
+.theme-toggle{
+  position:absolute;
+  top:10px;
+  right:14px;
+  padding:5px 11px;
+  font-size:11px;
+  border-radius:20px;
+}
+.theme-toggle .t-icon{display:inline-block;transform:rotate(0deg);transition:transform .2s}
+html[data-theme="paper"] .theme-toggle .t-icon{transform:rotate(180deg)}
+
 .brand{
   display:inline-flex;
   align-items:center;
@@ -5653,6 +5699,223 @@ pre#out .n{color:#e8b880}
   background:var(--accent);
 }
 
+/* ================= PAPER THEME (light, warm parchment) =================
+   Easy-on-the-eyes light look. Scoped to html[data-theme="paper"] so the
+   midnight theme stays the default; only variables + dark rgba() overlays
+   are remapped, layout is untouched. */
+
+html[data-theme="paper"]{
+  --bg:#efe7d5;
+  --panel:#f6f0e0;
+  --panel-2:#fdf8ec;
+  --line:#d8cdae;
+  --line-soft:#e4d9bf;
+  --ink:#3d342a;
+  --ink-dim:#6f6355;
+  --ink-faint:#9a8c77;
+  --accent:#1f7a6e;
+  --name:#9a6414;
+  --danger:#b04a3a;
+  --warn:#8a6410;
+  --ww-shadow:0 12px 28px rgba(93,74,45,.16);
+  color-scheme:light;
+}
+
+html[data-theme="paper"] body{
+  background:
+    radial-gradient(ellipse at 3% 0%,rgba(154,100,20,.08),transparent 42%),
+    radial-gradient(ellipse at 95% 18%,rgba(31,122,110,.07),transparent 45%),
+    var(--bg);
+}
+
+html[data-theme="paper"] header{
+  background:rgba(246,240,224,.96);
+  box-shadow:0 8px 24px rgba(93,74,45,.10);
+}
+
+html[data-theme="paper"] .brand::before{
+  border-color:rgba(154,100,20,.45);
+  background:linear-gradient(145deg,rgba(154,100,20,.14),rgba(154,100,20,.03));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+}
+
+html[data-theme="paper"] .entry-search-wrap{color-scheme:light}
+html[data-theme="paper"] .entry-search-results{box-shadow:0 14px 35px rgba(93,74,45,.22)}
+
+html[data-theme="paper"] .tabs{background:rgba(120,100,60,.10)}
+html[data-theme="paper"] .tab:hover{background:rgba(93,74,45,.07)}
+html[data-theme="paper"] .tab[aria-selected="true"]{
+  background:linear-gradient(180deg,rgba(154,100,20,.16),rgba(154,100,20,.06));
+  color:#7c4f0e;
+  box-shadow:inset 0 0 0 1px rgba(154,100,20,.28);
+}
+html[data-theme="paper"] .tab[aria-selected="true"]::after{background:var(--name)}
+
+html[data-theme="paper"] #charName{background:rgba(255,255,255,.6)}
+html[data-theme="paper"] #charName:focus{box-shadow:0 0 0 3px rgba(154,100,20,.14)}
+
+html[data-theme="paper"] .btn{
+  background:linear-gradient(180deg,#fffdf4,#f1e8d2);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
+}
+html[data-theme="paper"] .btn:hover{box-shadow:0 4px 12px rgba(93,74,45,.14)}
+html[data-theme="paper"] .btn.primary{
+  color:#fdf8ec;
+  border-color:#8a5a10;
+  background:linear-gradient(180deg,#b57a1c,#96630f);
+  box-shadow:0 3px 12px rgba(154,100,20,.25);
+}
+html[data-theme="paper"] .btn.primary:hover{
+  border-color:#7c4f0e;
+  background:linear-gradient(180deg,#c1851f,#a26d12);
+}
+html[data-theme="paper"] #btnWipe{background:transparent;box-shadow:none}
+
+html[data-theme="paper"] .project-menu{background:rgba(253,248,236,.99);box-shadow:0 14px 32px rgba(93,74,45,.22)}
+html[data-theme="paper"] .project-menu button:hover{background:rgba(93,74,45,.07)}
+html[data-theme="paper"] .project-menu button.danger:hover{background:rgba(176,74,58,.10)}
+html[data-theme="paper"] .project-mini:hover{background:#efe5cb}
+
+html[data-theme="paper"] .form{
+  background:radial-gradient(ellipse at 0% 30%,rgba(31,122,110,.05),transparent 60%);
+}
+
+html[data-theme="paper"] .sec{background:rgba(253,248,236,.9);box-shadow:0 3px 12px rgba(93,74,45,.08)}
+html[data-theme="paper"] .sec:hover{border-color:#c9b98f}
+html[data-theme="paper"] .sec[open]{
+  border-color:#9db8a8;
+  box-shadow:inset 3px 0 0 rgba(31,122,110,.55),0 8px 22px rgba(93,74,45,.10);
+}
+html[data-theme="paper"] .sec > summary{background:rgba(93,74,45,.045)}
+html[data-theme="paper"] .sec > summary:hover{background:rgba(93,74,45,.09)}
+html[data-theme="paper"] .sec[open] > summary{
+  background:linear-gradient(90deg,rgba(31,122,110,.08),transparent 75%);
+  border-bottom:1px solid rgba(93,74,45,.12);
+}
+
+html[data-theme="paper"] .field label{color:#5c5142}
+html[data-theme="paper"] .field input,
+html[data-theme="paper"] .field textarea,
+html[data-theme="paper"] .row input,
+html[data-theme="paper"] .row textarea{
+  border-color:#c4b48c;
+  background:rgba(255,253,244,.85);
+  box-shadow:inset 0 2px 5px rgba(93,74,45,.07);
+}
+html[data-theme="paper"] .field input:hover,
+html[data-theme="paper"] .field textarea:hover,
+html[data-theme="paper"] .row input:hover,
+html[data-theme="paper"] .row textarea:hover{border-color:#a8946a}
+html[data-theme="paper"] .field input:focus,
+html[data-theme="paper"] .field textarea:focus,
+html[data-theme="paper"] .row input:focus,
+html[data-theme="paper"] .row textarea:focus{
+  background:#fffdf4;
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(31,122,110,.12);
+}
+html[data-theme="paper"] .field input::placeholder,
+html[data-theme="paper"] .field textarea::placeholder,
+html[data-theme="paper"] .row input::placeholder,
+html[data-theme="paper"] .row textarea::placeholder{color:#a89a80}
+html[data-theme="paper"] .field select[data-k],
+html[data-theme="paper"] .map-obj select,
+html[data-theme="paper"] #mapExits select,
+html[data-theme="paper"] #projectSelect,
+html[data-theme="paper"] .entry-search-bar input,
+html[data-theme="paper"] .entry-search-bar select,
+html[data-theme="paper"] .map-window-fields input,
+html[data-theme="paper"] .map-window-fields select,
+html[data-theme="paper"] .rg-field select,
+html[data-theme="paper"] .rg-field input,
+html[data-theme="paper"] .rg-status,
+html[data-theme="paper"] .ww-target input,
+html[data-theme="paper"] .lorebook-bar input,
+html[data-theme="paper"] #masterName,
+html[data-theme="paper"] .map-obj input,
+html[data-theme="paper"] .map-exit input,
+html[data-theme="paper"] #mapObjName,
+html[data-theme="paper"] .cluster-actions input,
+html[data-theme="paper"] .cluster-actions select,
+html[data-theme="paper"] #locationParent,
+html[data-theme="paper"] .imported-panel select,
+html[data-theme="paper"] .imported-panel pre{
+  background-color:#fffdf4;
+  border-color:#c4b48c;
+  color:var(--ink);
+}
+html[data-theme="paper"] .entry-search-bar select option{background:var(--panel-2);color:var(--ink)}
+
+html[data-theme="paper"] .lede,
+html[data-theme="paper"] .lorebook-bar{background:rgba(93,74,45,.05)}
+html[data-theme="paper"] .lede{border-left-color:rgba(154,100,20,.6);color:var(--ink-dim)}
+html[data-theme="paper"] .lorebook-bar input{background:rgba(255,253,244,.85)}
+
+html[data-theme="paper"] .roster{background:rgba(233,222,196,.96)}
+html[data-theme="paper"] .chip{
+  background:linear-gradient(150deg,#fffdf4,#f3ead3);
+  border-color:#c9b98f;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
+}
+html[data-theme="paper"] .chip:hover{border-color:#a8946a}
+html[data-theme="paper"] .chip.active{
+  border-color:rgba(154,100,20,.65);
+  background:linear-gradient(140deg,rgba(154,100,20,.14),rgba(154,100,20,.04)),#fdf3dc;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 3px 12px rgba(93,74,45,.12);
+}
+html[data-theme="paper"] .ww-avatar{background:rgba(93,74,45,.10)}
+html[data-theme="paper"] .add{background:rgba(31,122,110,.06);border-color:#9db8a8}
+
+html[data-theme="paper"] .preview{
+  background:radial-gradient(ellipse at 100% 0%,rgba(31,122,110,.07),transparent 60%),#e9dfc7;
+  box-shadow:inset 12px 0 32px rgba(93,74,45,.08);
+}
+html[data-theme="paper"] .pv-head{background:rgba(93,74,45,.05)}
+html[data-theme="paper"] #totalTok{background:rgba(93,74,45,.08)}
+html[data-theme="paper"] .ww-preview-tools{background:rgba(93,74,45,.06)}
+html[data-theme="paper"] .ww-view-switch{background:#e2d5b4}
+html[data-theme="paper"] .ww-view-btn[aria-pressed="true"]{background:#fffdf4;box-shadow:0 1px 4px rgba(93,74,45,.18)}
+html[data-theme="paper"] .ww-target input{background:#fffdf4}
+html[data-theme="paper"] .ww-progress-line progress,
+html[data-theme="paper"] .ww-progress-line progress::-webkit-progress-bar{background:#d3c49c}
+html[data-theme="paper"] pre#out{color:#4a4136}
+html[data-theme="paper"] pre#out .h{color:#16685d}
+html[data-theme="paper"] pre#out .n{color:#8a5a10}
+
+html[data-theme="paper"] .ww-doc{color:#4a4136}
+html[data-theme="paper"] .ww-doc-title{border-bottom-color:rgba(154,100,20,.35);color:#7c4f0e}
+html[data-theme="paper"] .credits h1{color:#7c4f0e}
+html[data-theme="paper"] .cr{background:rgba(253,248,236,.9);box-shadow:0 4px 15px rgba(93,74,45,.08)}
+
+html[data-theme="paper"] .rg-card,
+html[data-theme="paper"] .rg-raw-card{background:rgba(253,248,236,.92);box-shadow:0 4px 16px rgba(93,74,45,.10)}
+html[data-theme="paper"] .rg-raw-head{background:rgba(93,74,45,.05)}
+html[data-theme="paper"] .rg-canvas-wrap{
+  background:radial-gradient(circle at 50% 45%,rgba(31,122,110,.07),transparent 48%),rgba(233,222,196,.5);
+}
+html[data-theme="paper"] #relationshipSvg .rg-node rect{filter:drop-shadow(0 5px 8px rgba(93,74,45,.18))}
+html[data-theme="paper"] #relationshipSvg .rg-edge-label-bg{fill:var(--panel-2)}
+html[data-theme="paper"] #rgRaw{background:#f3ecda;color:#4a4136}
+html[data-theme="paper"] #relationshipSvg .rg-node.pick-a rect{filter:drop-shadow(0 0 9px rgba(154,100,20,.30)) drop-shadow(0 5px 8px rgba(93,74,45,.18))}
+html[data-theme="paper"] #relationshipSvg .rg-node.pick-b rect{filter:drop-shadow(0 0 9px rgba(31,122,110,.30)) drop-shadow(0 5px 8px rgba(93,74,45,.18))}
+
+html[data-theme="paper"] .map-cell{background:rgba(93,74,45,.08)}
+html[data-theme="paper"] .map-cell.w{background:var(--ink-faint)}
+html[data-theme="paper"] .map-cell.o{background:rgba(31,122,110,.25)}
+html[data-theme="paper"] .map-cell.win{background:rgba(70,130,180,.22)}
+html[data-theme="paper"] .map-window{background:var(--panel-2)}
+html[data-theme="paper"] .overview-wrap,
+html[data-theme="paper"] .map-grid-wrap{background:#f7f1e1}
+html[data-theme="paper"] #overviewSvg .room{fill:rgba(31,122,110,.12)}
+html[data-theme="paper"] #overviewSvg .room.active{fill:rgba(154,100,20,.18)}
+html[data-theme="paper"] #overviewSvg .room.orphan{fill:rgba(93,74,45,.05)}
+html[data-theme="paper"] .cluster-boundary{fill:rgba(31,122,110,.07)}
+html[data-theme="paper"] .map-window summary{color:#2f6b8f}
+html[data-theme="paper"] #toast{background:rgba(253,248,236,.98);border-color:#b3a37e;box-shadow:var(--ww-shadow)}
+html[data-theme="paper"] .wi-panel,
+html[data-theme="paper"] .wi-section{border-top-color:var(--line)}
+html[data-theme="paper"] .cluster-dialog{background:rgba(31,122,110,.06)}
+
 /* ---------- smaller screens ---------- */
 
 @media(min-width:1500px){
@@ -5685,7 +5948,12 @@ pre#out .n{color:#e8b880}
   }
   .namebar{max-width:none}
   .toolbar{gap:6px}
-  .tabs{gap:3px}
+  .tabs{gap:3px;flex:1 1 100%;min-width:0;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs:not(.at-start):not(.at-end){-webkit-mask-image:linear-gradient(to right,transparent,#000 26px,#000 calc(100% - 26px),transparent);mask-image:linear-gradient(to right,transparent,#000 26px,#000 calc(100% - 26px),transparent)}
+  .tabs.at-start:not(.at-end){-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 26px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 26px),transparent)}
+  .tabs:not(.at-start).at-end{-webkit-mask-image:linear-gradient(to right,transparent,#000 26px);mask-image:linear-gradient(to right,transparent,#000 26px)}
+  .tabs.at-start.at-end{-webkit-mask-image:none;mask-image:none}
   .tab{padding:8px 11px}
   .pv-head{padding:13px 16px}
   .ww-preview-tools{padding:10px 16px}
@@ -6298,6 +6566,40 @@ pre#out .n{color:#e8b880}
     toast.setAttribute("aria-live", "polite");
     toast.setAttribute("aria-atomic", "true");
   }
+
+  /* ---------- paper / midnight theme toggle (persisted with prefs) ---------- */
+
+  const themeToggle = document.getElementById("themeToggle");
+
+  function paintThemeButton(){
+    if(!themeToggle) return;
+    const paper = document.documentElement.dataset.theme === "paper";
+    themeToggle.setAttribute("aria-pressed", String(paper));
+    themeToggle.title = paper ? "Switch to midnight (dark) theme" : "Switch to paper (light) theme";
+    const label = themeToggle.querySelector(".t-label");
+    if(label) label.textContent = paper ? "Midnight" : "Paper";
+  }
+
+  function setTheme(name, remember){
+    if(name === "paper"){
+      document.documentElement.dataset.theme = "paper";
+    }else{
+      delete document.documentElement.dataset.theme;
+    }
+    if(remember){
+      prefs.theme = name;
+      savePrefs();
+    }
+    paintThemeButton();
+  }
+
+  if(themeToggle){
+    themeToggle.addEventListener("click", ()=>{
+      setTheme(document.documentElement.dataset.theme === "paper" ? "midnight" : "paper", true);
+    });
+  }
+
+  setTheme(prefs.theme === "paper" ? "paper" : "midnight", false);
 
   setView(currentView, false);
   updateMeter(output.textContent);
