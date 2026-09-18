@@ -36,7 +36,7 @@ History: events, and how they affect the present
 
 Concepts: magic systems, laws, customs, species, anything else
 
-# Changelog 
+# Changelog (September 17th, 2026)
 
 - Multiple projects with separate autosaves and project backups.
 
@@ -67,23 +67,3 @@ Concepts: magic systems, laws, customs, species, anything else
 - Recovery of the previous autosaved workspace into a project.
 
 - Removed external font requests; import processing stays local without AI.
-## New Fields to Fill Out
-Main characters
-- Face: Placeholder examples: sharp, pudgy, froggy, mature, withered.
-- Non-human features: an optional toggle at the bottom of Appearance, off by default. Adds coat/scales/feathers, ears, tail, muzzle & teeth, hands & feet, build & stance, and a free-text field for horns, wings, and anything else. 
--Core belief and emotional need: four optional fields at the bottom of Psychology: core belief, protective strategy, emotional need, and conditions for change. They explain why the triggers above them fire and what could change them.
-- What they know / What they wrongly believe: gives the model a knowledge state to play.
-- Usual underwear: added to Body & intimate details.
-## Side characters
--What they know / What they wrongly believe: same thing from from main characters.
-## Scenario
--Genre and Themes
-
--Overarching story: a new section with three fields: what's going on, what it's driving toward, and what happens if nobody acts. 
-
-History
-
--What people say happened: the public account under what really happened. NPCs can repeat the public, wrongful version while the narration knows better.
-## Output format: every section is now an XML tag
-
-Each section of every entry now exports wrapped in its own tag, named after the entry and the section so the AI can recall information better.
