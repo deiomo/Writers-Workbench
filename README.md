@@ -14,6 +14,10 @@ Its a HTML file so you can use it offline. No shady extensions that steals your 
 
 It comes with token counter, but don't expect it to be accurate.
 
+A map maker that generates a dynamic description
+
+Character relationship graph 
+
 # Current templates available:
 
 Main characters: full cards with contradiction, descriptions, likes/fears, NSFW sections, non-human mode
@@ -32,20 +36,37 @@ History: events, and how they affect the present
 
 Concepts: magic systems, laws, customs, species, anything else
 
-# Changelog
+# Changelog 
 
--A visual overhaul to add some "pizzaz"
+- Multiple projects with separate autosaves and project backups.
 
--Autosave: Your progressed is cached in your browser. You can close it and open it again, your progress will still be there. 
+- Local character imports for JSON, PNG, text, and Markdown, without requiring the template.
 
--Reset all: Resets progress in all tabs for convenience
+- Location map builder with walls, doors, objects, exits, and generated descriptions.
 
--Example dialogue writing prompts to help you brainstorm dialogue for main and side characters
+- Nested location groups for floors, houses, neighborhoods, and towns.
 
-- 13 prompts covering moods and situations: good mood, bad news, angered, small talk, bumped into by a stranger, complimented, asked to do something they don't want, caught in a lie, meeting someone new, someone they care about threatened, asked about their past, flirted with, under real pressure.   
+- Character relationship graph with labeled, reciprocal or one-way connections.
 
-- 5 prompts. Meeting {{user}}, {{user}} wants something, {{user}} has annoyed them, talking about their own work, something goes wrong in front of them.
+- Per-entry lorebook settings covering activation, keywords, placement, timing, recursion, and inclusion groups.
 
+- Project-wide search with category filters and clickable results.
+
+# Quality-of-life improvements
+
+- Combined “Export everything” lorebook export.
+  
+- Move imported passages into template fields while preserving the original card.
+  
+- Two-click room and group connections without extra confirmation.
+  
+- Multi-selection, group movement, collapse/expand, and resizing-aware graph dragging.
+  
+- Keyboard shortcuts and matching dark-theme styling for search.
+  
+- Recovery of the previous autosaved workspace into a project.
+
+- Removed external font requests; import processing stays local without AI.
 ## New Fields to Fill Out
 Main characters
 - Face: Placeholder examples: sharp, pudgy, froggy, mature, withered.
