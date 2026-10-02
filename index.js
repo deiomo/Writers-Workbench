@@ -10,9 +10,13 @@
  */
 
 const CHANNEL = 'writers-workbench-bridge';
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 const MAX_ENTRIES = 2000;
 const MAX_CONTENT = 200000;
+const MAX_KEY = 2000;       // one keyword (long regex keys included)
+const MAX_KEYS = 500;       // keywords per list
+const MAX_TEXT = 20000;     // any other text field
+const LEADER_LOCK = 'writers-workbench-bridge-leader';
 
 const ctx = () => SillyTavern.getContext();
 
@@ -98,22 +102,27 @@ const ENTRY_DEFAULTS = {
     useGroupScoring: null, automationId: '', role: null, sticky: 0, cooldown: 0, delay: 0,
 };
 
-function sanitizeEntry(raw) {
+/* `cut` counts every field that had to be shortened, so the Workbench can say so */
+function sanitizeEntry(raw, cut) {
     if (!raw || typeof raw !== 'object') return null;
     const wwId = typeof raw.wwId === 'string' ? raw.wwId.slice(0, 120) : '';
     if (!wwId) return null;
     const out = { wwId };
+    const clip = (str, max) => { if (str.length > max) { if (cut) cut.n++; return str.slice(0, max); } return str; };
     for (const [k, def] of Object.entries(ENTRY_DEFAULTS)) {
         const v = raw[k];
         if (v === undefined) { out[k] = Array.isArray(def) ? [] : def; continue; }
         if (Array.isArray(def)) {
-            out[k] = Array.isArray(v) ? v.filter(x => typeof x === 'string').map(x => x.slice(0, 200)).slice(0, 50) : [];
+            if (!Array.isArray(v)) { out[k] = []; continue; }
+            const list = v.filter(x => typeof x === 'string');
+            if (list.length > MAX_KEYS && cut) cut.n++;
+            out[k] = list.slice(0, MAX_KEYS).map(x => clip(x, MAX_KEY));
         } else if (typeof def === 'boolean') {
             out[k] = !!v;
         } else if (typeof def === 'number') {
             out[k] = Number.isFinite(Number(v)) ? Number(v) : def;
         } else if (typeof def === 'string') {
-            out[k] = String(v).slice(0, k === 'content' ? MAX_CONTENT : 500);
+            out[k] = clip(String(v), k === 'content' ? MAX_CONTENT : MAX_TEXT);
         } else {
             out[k] = (v === null || typeof v === 'boolean' || typeof v === 'number') ? v : def;
         }
@@ -121,7 +130,7 @@ function sanitizeEntry(raw) {
     /* anything ST has that we don't list (e.g. newer fields) passes through if it's a plain value */
     for (const [k, v] of Object.entries(raw)) {
         if (k in out || k === 'uid' || k === 'displayIndex') continue;
-        if (v === null || ['string', 'number', 'boolean'].includes(typeof v)) out[k] = typeof v === 'string' ? v.slice(0, 500) : v;
+        if (v === null || ['string', 'number', 'boolean'].includes(typeof v)) out[k] = typeof v === 'string' ? clip(v, MAX_TEXT) : v;
     }
     return out;
 }
@@ -176,7 +185,9 @@ async function pushBook(msg) {
     const f = await wi();
     const book = cleanBookName(msg.book);
     if (!book) throw new Error('No lorebook name');
-    const incoming = (Array.isArray(msg.entries) ? msg.entries : []).slice(0, MAX_ENTRIES).map(sanitizeEntry).filter(Boolean);
+    const cut = { n: 0 };
+    const incoming = (Array.isArray(msg.entries) ? msg.entries : []).slice(0, MAX_ENTRIES).map(e => sanitizeEntry(e, cut)).filter(Boolean);
+    const truncated = cut.n;
 
     const exists = (await f.names()).includes(book);
     let data = exists ? await f.loadWorldInfo(book) : null;
@@ -242,7 +253,7 @@ async function pushBook(msg) {
     }
 
     if (!created && !updated && !removed && exists) {
-        return { book, created, updated, removed, unchanged, adopted, createdBook: false };
+        return { book, created, updated, removed, unchanged, adopted, truncated, createdBook: false };
     }
 
     /* new book: write now so it appears in ST's lists; existing book: cache now, disk on debounce */
@@ -250,7 +261,7 @@ async function pushBook(msg) {
     if (!exists && typeof f.updateWorldInfoList === 'function') await f.updateWorldInfoList();
     try { if (typeof f.reloadEditor === 'function') f.reloadEditor(book); } catch (_) { /* editor not open on this book */ }
 
-    return { book, created, updated, removed, unchanged, adopted, createdBook: !exists };
+    return { book, created, updated, removed, unchanged, adopted, truncated, createdBook: !exists };
 }
 
 function openChannel() {
@@ -317,6 +328,7 @@ function openChannel() {
                 if (r.updated) parts.push(`~${r.updated}`);
                 if (r.removed) parts.push(`-${r.removed}`);
                 if (r.adopted) parts.push(`linked ${r.adopted}`);
+                if (r.truncated) parts.push(`${r.truncated} truncated`);
                 if (parts.length) note(`${r.book}: ${parts.join(' ')}`);
                 if (r.createdBook) toastr.info(`Created lorebook "${r.book}". Activate it in World Info to use it in chat.`, "Writer's Workbench");
                 setStatus(`Live: ${r.book}`, true);
@@ -370,19 +382,50 @@ function addUi() {
     }
 }
 
+/* open the channel and tell any waiting Workbench tab we're here */
+async function startServing() {
+    openChannel();
+    const problem = await capabilityProblem();
+    if (problem) { setStatus(problem, false); note(problem); }
+    else if (channel) {
+        /* a Workbench tab opened before this loaded would otherwise wait on its retry */
+        const f = await wi();
+        channel.postMessage({ type: 'ready', version: VERSION, st: stVersion, worlds: await f.names() });
+    }
+}
+
+/* With two SillyTavern tabs open, both would answer every message and each would write the
+   whole book from its own cache, so a stale tab could undo edits made in the other one.
+   Only the tab holding this lock opens the channel; another takes over when it closes. */
+async function startBridge() {
+    const locks = typeof navigator !== 'undefined' && navigator.locks;
+    if (!locks || typeof locks.request !== 'function') { await startServing(); return; }
+    const serve = async () => {
+        note('This tab is now handling the Workbench');
+        try { await startServing(); } catch (err) { console.error('[WW Bridge] failed to start', err); }
+        return new Promise(() => { });  // hold the lock until this tab closes
+    };
+    /* the request's own promise only settles when the lock is released, so don't await it */
+    const got = await new Promise(resolve => {
+        locks.request(LEADER_LOCK, { ifAvailable: true }, lock => {
+            if (!lock) { resolve(false); return null; }
+            resolve(true);
+            return serve();
+        }).catch(err => { console.error('[WW Bridge] lock failed', err); resolve(null); });
+    });
+    if (got === null) { await startServing(); return; }
+    if (got) return;
+    setStatus('Another SillyTavern tab is handling the Workbench', false);
+    note('Another SillyTavern tab is handling the Workbench; this one takes over if it closes');
+    locks.request(LEADER_LOCK, serve).catch(err => console.error('[WW Bridge] lock failed', err));
+}
+
 jQuery(async () => {
     try {
         addUi();
         await detectVersion();
-        openChannel();
         note(`Bridge ${VERSION} loaded on SillyTavern ${stVersion || '(unknown version)'}`);
-        const problem = await capabilityProblem();
-        if (problem) { setStatus(problem, false); note(problem); }
-        else if (channel) {
-            /* a Workbench tab opened before this loaded would otherwise wait on its retry */
-            const f = await wi();
-            channel.postMessage({ type: 'ready', version: VERSION, st: stVersion, worlds: await f.names() });
-        }
+        await startBridge();
         console.log(`[WW Bridge] ${VERSION} ready on SillyTavern ${stVersion}`);
     } catch (err) {
         console.error('[WW Bridge] failed to start', err);

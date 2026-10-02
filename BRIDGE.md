@@ -42,11 +42,16 @@ SillyTavern's own editor to linked entries are overwritten by the next sync.
 - Only the lorebook you name.
 - Only entries the Workbench made (they carry `wwId` and `wwProject` fields). Entries you write
   by hand in the same book are never changed or removed.
-- An entry is removed only when the same project made it and you deleted it in the Workbench.
-  Entries from other projects, and entries you merely unticked in Export everything, are kept.
-  Pausing Live removes nothing.
+- An entry is removed only when the same project made it and it no longer syncs: you deleted it
+  in the Workbench, made another scenario active, or unticked its kind on the Live tab.
+  Entries from other projects are kept. Pausing Live removes nothing.
 - Side characters, locations, items, factions, history, and concepts always sync. The Live tab
   has its own checkboxes for the active scenario, main characters, and the relationship graph.
+- Switching to another project in the Workbench pauses Live, so one project is never pushed
+  into a book another project is syncing by accident. Tick Live again to sync the new one.
+  A duplicated project gets fresh ids, so the original and the copy can share a book.
+- With SillyTavern open in several tabs, only one tab's bridge answers the Workbench. If it
+  closes, another tab takes over.
 
 ## Notes
 

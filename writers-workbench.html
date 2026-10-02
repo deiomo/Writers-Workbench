@@ -1559,7 +1559,7 @@ pre#out .h{color:var(--accent)}
         <label class="toggle"><input type="checkbox" id="liveScenario" checked> Active scenario (always on in chat)</label>
         <label class="toggle"><input type="checkbox" id="liveMain"> Main characters</label>
         <label class="toggle"><input type="checkbox" id="liveRelationships" checked> Relationship graph (always on in chat)</label>
-        <p class="hint">Unticking something stops it syncing. It isn't removed from SillyTavern.</p>
+        <p class="hint">Unticking something removes the Workbench's copy from the lorebook on the next sync, and switching the active scenario swaps it out. Pausing Live removes nothing.</p>
       </section>
 
       <section class="live-card">
@@ -2714,6 +2714,12 @@ let liveCh = null, liveReady = false, liveOn = false, liveTimer = null, livePoll
 let liveLastHash = '', liveBusy = false, liveAgain = false, liveReq = 0;
 let liveTarget = '';   // the lorebook actually being synced; typing in the box doesn't change it
 let liveAdopt = false;  // link entries from an earlier Workbench export instead of duplicating them
+let liveSwitching = false; // a target change (and maybe an import) is in progress: push nothing
+let liveProjectId = '';    // the project live sync was started for; switching projects pauses it
+let liveInFlight = null;   // requestId of the push we're waiting on
+/* request ids are unique per tab: other Workbench tabs share the channel and see our replies */
+const LIVE_TAB = Math.random().toString(36).slice(2, 10);
+const liveRelId = ()=>'ww-relationships-'+(currentProjectId || 'default');
 
 function liveConn(text, state){
   const t = $("#liveConn"), d = $("#liveDot");
@@ -2743,6 +2749,27 @@ function liveLoadOptions(){
 }
 function liveStatus(text){ const el = $("#liveStatus"); if(el) el.textContent = text; }
 
+/* turn live off from code (not the checkbox): the status text set here stays put */
+function liveStop(status, logLine){
+  liveOn = false; liveBusy = false; liveAgain = false; liveInFlight = null;
+  clearInterval(livePoll); clearTimeout(liveTimer);
+  const toggle = $("#liveToggle"); if(toggle) toggle.checked = false;
+  const badge = $("#liveBadge"); if(badge) badge.hidden = true;
+  const sw = $("#liveSwitch"); if(sw) sw.hidden = true;
+  if(liveReady) liveConn('Connected to SillyTavern · paused', 'ok');
+  if(logLine) liveLog(logLine);
+  if(status) liveStatus(status);
+}
+
+/* switching projects while live would push a different project into the same book */
+function liveProjectChanged(){
+  if(!liveOn || liveSwitching || !liveProjectId || liveProjectId === currentProjectId) return false;
+  const book = liveTarget;
+  liveStop('Live paused: you switched projects. Tick Live to sync this project into "'+book+'".',
+           'Paused: switched projects');
+  return true;
+}
+
 function liveInit(){
   const toggle = $("#liveToggle");
   if(!toggle) return;
@@ -2762,7 +2789,7 @@ function liveInit(){
   let worlds = [];
   let waiters = {}, reqSeq = 0;
   const ask = (type, payload, ms)=>new Promise(resolve=>{
-    const id = ++reqSeq;
+    const id = LIVE_TAB+'-a'+(++reqSeq);
     waiters[id] = resolve;
     liveCh.postMessage(Object.assign({ type:type, requestId:id }, payload));
     setTimeout(()=>{ if(waiters[id]){ delete waiters[id]; resolve(null); } }, ms || 5000);
@@ -2787,8 +2814,15 @@ function liveInit(){
 
   const inspect = book=>ask('inspect', { book:book }, 4000);
 
-  /* confirm a target, check it for an earlier import, then start or switch */
+  /* confirm a target, check it for an earlier import, then start or switch.
+     Nothing is pushed while this runs: liveTarget may still be the old book while
+     the project is already the newly imported one. */
   const commitTarget = async (book, switching)=>{
+    liveSwitching = true;
+    try{ return await commitTargetInner(book, switching); }
+    finally{ liveSwitching = false; }
+  };
+  const commitTargetInner = async (book, switching)=>{
     const info = await inspect(book);
     const existing = info && info.exists;
     const q1 = switching
@@ -2800,8 +2834,9 @@ function liveInit(){
     if(existing){
       const read = await ask('read', { book:book }, 8000);
       const all = read && read.data ? Object.values(read.data.entries || {}).filter(e=>e && typeof e === 'object') : [];
-      const mine = new Set(liveKnownIds());
-      const missing = all.filter(e=>typeof e.wwId !== 'string' || !mine.has(e.wwId)).length;
+      const mine = new Set(liveProjectIds());
+      const missing = all.filter(e=>typeof e.wwId !== 'string' || !(mine.has(e.wwId) ||
+        (e.wwId === 'ww-relationships' && e.wwProject === (currentProjectId || 'default')))).length;
       if(missing){
         const pull = confirm('"'+book+'" has '+missing+(missing===1 ? ' entry' : ' entries')+' the Workbench doesn\'t have.\n\n'
           + 'Import the whole lorebook into a new project and keep it in sync? Entries the Workbench didn\'t make go to Concepts and are rewritten in Workbench format on the first sync.\n\n'
@@ -2811,15 +2846,22 @@ function liveInit(){
           await flushProjectSave();
           const rec = await createProject(book+' — Live', r.state);
           await switchProject(rec.id, false);
-          const linked = await ask('link', { book:book, project:currentProjectId, links:r.links }, 8000);
-          if(!linked){ liveStatus('Imported, but linking to SillyTavern failed. Nothing was synced.'); return false; }
+          /* the relationship entry's id is per project now */
+          const links = r.links.map(l=>l.wwId === 'ww-relationships' ? { uid:l.uid, wwId:liveRelId() } : l);
+          const linked = await ask('link', { book:book, project:currentProjectId, links:links }, 8000);
+          if(!linked){
+            const was = liveOn ? ' Nothing was synced into "'+liveTarget+'" either.' : '';
+            liveStop('Imported "'+book+'" into a new project, but linking it to SillyTavern failed, so live sync is off. Nothing was synced.'+was+' Tick Live to try again.',
+                     'Linking "'+book+'" failed; live sync off');
+            return false;
+          }
           if(r.counts.main) $("#liveMain").checked = true;
           if(r.relationships) $("#liveRelationships").checked = true;
           liveSaveOptions();
           const parts = Object.entries(r.counts).map(([k,n])=>n+' '+k);
           toast('Imported "'+book+'" into a new project: '+parts.join(', ')+'.');
           liveLog('Imported "'+book+'" into a new project: '+parts.join(', '));
-          liveTarget = book; liveLastHash = '';
+          liveTarget = book; liveLastHash = ''; liveProjectId = currentProjectId;
           return true;
         }
       }
@@ -2828,7 +2870,7 @@ function liveInit(){
       const one = info.adoptable === 1;
       liveAdopt = confirm('"'+book+'" has '+info.adoptable+(one ? ' entry that looks' : ' entries that look')+' like an earlier Workbench export.\n\nLink '+(one ? 'it' : 'them')+' so '+(one ? 'it updates' : 'they update')+' in place? If you choose Cancel, the Workbench adds its own copies next to '+(one ? 'it' : 'them')+'.');
     }
-    liveTarget = book; liveLastHash = '';
+    liveTarget = book; liveLastHash = ''; liveProjectId = currentProjectId;
     return true;
   };
 
@@ -2859,13 +2901,15 @@ function liveInit(){
       if(w){ delete waiters[m.requestId]; w(m.error ? null : m); }
     }
     if(m.type === 'pushed'){
-      liveBusy = false;
+      if(!liveInFlight || m.requestId !== liveInFlight) return;  // another tab's push, or one we gave up on
+      liveBusy = false; liveInFlight = null;
       const bits = [];
       if(m.createdBook) bits.push('created the book');
       if(m.adopted) bits.push(m.adopted+' linked');
       if(m.created) bits.push(m.created+' added');
       if(m.updated) bits.push(m.updated+' updated');
       if(m.removed) bits.push(m.removed+' removed');
+      if(m.truncated) bits.push(m.truncated+(m.truncated === 1 ? ' field' : ' fields')+' cut to the bridge\'s size limit');
       const t = new Date();
       liveStatus('Synced into "'+m.book+'" '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+(bits.length ? ' · '+bits.join(', ') : ' · no changes'));
       if(bits.length) liveLog(m.book+': '+bits.join(', '));
@@ -2876,7 +2920,12 @@ function liveInit(){
       if(liveAgain){ liveAgain = false; livePush(); }
     }
     if(m.type === 'error'){
-      liveBusy = false; liveLastHash = '';
+      const ours = !!liveInFlight && m.requestId === liveInFlight;
+      if(!m.fatal && !ours){
+        if(m.requestId === undefined || m.requestId === null) liveLog('Bridge: '+(m.message || 'unknown error'));
+        return;  // an error about another tab's request, or one not about a push
+      }
+      liveBusy = false; liveLastHash = ''; if(ours) liveInFlight = null;
       if(m.fatal){
         liveReady = true;
         toggle.disabled = true; toggle.checked = false; liveOn = false;
@@ -2920,6 +2969,7 @@ function liveInit(){
       livePoll = setInterval(livePush, 3000);
     } else {
       liveOn = false; clearInterval(livePoll); clearTimeout(liveTimer);
+      liveBusy = false; liveAgain = false; liveInFlight = null;
       $("#liveBadge").hidden = true; switchBtn.hidden = true;
       liveConn('Connected to SillyTavern · paused', 'ok');
       liveLog('Paused');
@@ -2962,38 +3012,57 @@ function liveEntries(){
     r.content = window.wwRelationshipMarkdown().trim();
     r.comment = "[Cast] Relationships";
     r.constant = true; r.selective = false; r.key = [];
-    r.wwId = 'ww-relationships';
+    r.wwId = liveRelId();
     delete r.uid; delete r.displayIndex;
     entries.push(r);
   }
   return entries;
 }
 
-function liveKnownIds(){
+/* every entity id in the project (used to tell which entries in a book are ours) */
+function liveProjectIds(){
   const ids = [];
   Object.keys(S).forEach(k=>(S[k].list||[]).forEach(st=>{ if(!st.id) st.id = wwId(k); ids.push(st.id); }));
-  if(window.wwRelationshipCount && window.wwRelationshipCount()) ids.push('ww-relationships');
+  if(window.wwRelationshipCount && window.wwRelationshipCount()) ids.push(liveRelId());
   return ids;
 }
 
+/* ids the bridge must keep for this project: everything pushed, plus entries in a synced
+   category that masterCollect skipped (empty, or otherwise left out of Export everything).
+   Inactive scenarios and categories unticked on the Live tab are not listed, so the bridge
+   prunes their old copies. */
+function liveKnownIds(entries){
+  const ids = new Set((entries || liveEntries()).map(e=>e.wwId).filter(Boolean));
+  const keep = st=>{ if(st && st.id) ids.add(st.id); };
+  if($("#liveScenario").checked) keep(S.scenario.list[S.scenario.active]);
+  if($("#liveMain").checked) S.main.list.forEach(keep);
+  MASTER_KINDS.forEach(([kind])=>S[kind].list.forEach(keep));
+  return [...ids];
+}
+
 function livePush(){
-  if(!liveOn || !liveCh || !liveReady) return;
+  if(!liveOn || !liveCh || !liveReady || liveSwitching) return;
+  if(liveProjectChanged()) return;
   if(liveBusy){ liveAgain = true; return; }
   const book = liveTarget;
   if(!book) return;
   let entries;
   try{ entries = liveEntries(); }catch(err){ liveStatus('Could not build entries: '+err.message); return; }
-  const hash = book + '|' + JSON.stringify(entries);
+  const knownIds = liveKnownIds(entries);
+  const hash = book + '|' + JSON.stringify(entries) + '|' + knownIds.join(',');
   if(hash === liveLastHash) return;
   liveLastHash = hash;
   liveBusy = true;
-  liveCh.postMessage({ type:'push', requestId: ++liveReq, book: book, entries: entries, prune: true, adopt: liveAdopt,
-                       project: currentProjectId || 'default', knownIds: liveKnownIds() });
-  setTimeout(()=>{ if(liveBusy){ liveBusy = false; liveLastHash = ''; liveStatus('No answer from SillyTavern. Is its tab still open?'); } }, 8000);
+  const id = LIVE_TAB+'-p'+(++liveReq);
+  liveInFlight = id;
+  liveCh.postMessage({ type:'push', requestId: id, book: book, entries: entries, prune: true, adopt: liveAdopt,
+                       project: currentProjectId || 'default', knownIds: knownIds });
+  setTimeout(()=>{ if(liveBusy && liveInFlight === id){ liveBusy = false; liveInFlight = null; liveLastHash = ''; liveStatus('No answer from SillyTavern. Is its tab still open?'); } }, 8000);
 }
 
 function liveSchedule(){
-  if(!liveOn) return;
+  if(!liveOn || liveSwitching) return;
+  if(liveProjectChanged()) return;
   clearTimeout(liveTimer);
   liveTimer = setTimeout(livePush, 700);
 }
@@ -4540,7 +4609,37 @@ async function renameProject(){
 async function duplicateProject(){
   await flushProjectSave();
   const rec=await dbGetProject(currentProjectId); if(!rec) return;
-  const copy=await createProject((rec.name||projectNameFallback())+" — Copy",rec.state);
+  /* Give every entity a fresh id. Live sync matches lorebook entries by id, so a copy that
+     kept the original's ids would fight it over the same entries. References (relationship
+     ends, graph positions, exits and parents inside location map JSON, ...) are rewritten by
+     exact-token replacement over the serialized state, which also reaches nested JSON strings. */
+  const remap={};
+  const collect=v=>{
+    if(Array.isArray(v)){ v.forEach(collect); return; }
+    if(!v || typeof v!=="object") return;
+    Object.keys(v).forEach(k=>{
+      if(k==="id" && typeof v[k]==="string" && v[k] && !remap[v[k]]){
+        const m=v[k].match(/^([A-Za-z]+)_/);
+        remap[v[k]]=wwId(m ? m[1] : "entry");
+      }else collect(v[k]);
+    });
+  };
+  collect(rec.state);
+  let json=JSON.stringify(rec.state);
+  const olds=Object.keys(remap).filter(id=>id.length>=6).sort((a,b)=>b.length-a.length);
+  if(olds.length){
+    const re=new RegExp("(?<![A-Za-z0-9_-])("+olds.map(id=>id.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")+")(?![A-Za-z0-9_-])","g");
+    json=json.replace(re,id=>remap[id]);
+  }
+  const state=JSON.parse(json);
+  /* short odd ids (from an imported lorebook) are only swapped where they are an id */
+  const fixShort=v=>{
+    if(Array.isArray(v)){ v.forEach(fixShort); return; }
+    if(!v || typeof v!=="object") return;
+    Object.keys(v).forEach(k=>{ if(k==="id" && typeof v[k]==="string" && remap[v[k]]) v[k]=remap[v[k]]; else fixShort(v[k]); });
+  };
+  if(Object.keys(remap).some(id=>id.length<6)) fixShort(state);
+  const copy=await createProject((rec.name||projectNameFallback())+" — Copy",state);
   await switchProject(copy.id,false); toast("Project duplicated");
 }
 
