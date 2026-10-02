@@ -1,0 +1,12 @@
+{
+    "display_name": "Writer's Workbench Bridge",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "Deiomo",
+    "version": "0.3.0",
+    "homePage": "",
+    "auto_update": false
+}

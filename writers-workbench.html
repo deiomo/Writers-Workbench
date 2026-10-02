@@ -181,6 +181,13 @@ header{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 22px
 .map-exit input{flex:1;min-width:130px;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 9px;color:var(--ink);font-size:13px}
 .field select[data-k]{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:8px 10px;color:var(--ink);font-size:14px}
 .map-exit label.toggle{font-size:12.5px}
+.paste-panel .paste-results{margin:8px 0 4px;display:flex;flex-direction:column;gap:4px;max-height:320px;overflow-y:auto}
+.paste-row{display:grid;grid-template-columns:18px 170px 1fr;gap:10px;align-items:start;padding:6px 8px;border:1px solid var(--line-soft);border-radius:4px;cursor:pointer}
+.paste-row:hover{background:var(--panel-2)}
+.paste-row input{margin-top:2px;accent-color:var(--accent)}
+.paste-field{color:var(--accent);font-size:12.5px;font-weight:500}
+.paste-value{color:var(--ink-dim);font-size:12.5px;line-height:1.45;word-break:break-word}
+@media (max-width:640px){.paste-row{grid-template-columns:18px 1fr;gap:6px}.paste-value{grid-column:2}}
 .hint-list{margin:-6px 0 12px;padding-left:16px;list-style:disc}
 .hint-list li{margin-bottom:3px;line-height:1.5}
 .hint-list strong{color:var(--ink-dim);font-weight:500}
@@ -300,6 +307,25 @@ header{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 22px
 .master-row label:first-child{color:var(--ink-dim);font-size:13px;white-space:nowrap}
 #masterName{flex:1;min-width:200px;max-width:340px;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 10px;color:var(--ink);font-size:13.5px}
 #masterName:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(95,184,176,.12)}
+.live-inner{max-width:720px}
+.live-card{border:1px solid var(--line-soft);border-radius:8px;padding:14px 16px;margin:0 0 14px;background:var(--panel)}
+.live-card h2{margin:0 0 10px;font-size:14px;font-weight:600}
+.live-card h2:not(:first-child){margin-top:16px}
+.live-conn{display:flex;align-items:center;gap:10px;font-size:14px}
+.live-dot{width:10px;height:10px;border-radius:50%;background:var(--ink-faint);flex:none}
+.live-dot.ok{background:#4caf82}.live-dot.bad{background:var(--danger)}.live-dot.on{background:var(--accent);box-shadow:0 0 0 4px rgba(95,184,176,.18)}
+.live-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.live-onoff{display:inline-flex;align-items:center;gap:8px;font-weight:600;cursor:pointer}
+.live-onoff input{width:18px;height:18px;accent-color:var(--accent)}
+.live-status{margin:10px 0 0;color:var(--ink-dim);font-size:13px;line-height:1.5}
+.live-card .toggle{display:flex;margin:6px 0}
+.live-log{font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--ink-dim);max-height:220px;overflow-y:auto;white-space:pre-wrap}
+.live-list{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;line-height:1.6}
+.live-list li{margin-bottom:4px}
+#liveBadge{cursor:pointer}
+#liveBookSelect{min-width:200px;max-width:300px;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;color:var(--ink);font-size:13.5px}
+#liveBook{flex:1;min-width:180px;max-width:300px;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 10px;color:var(--ink);font-size:13.5px}
+#liveBadge{color:var(--accent);font-size:12px;font-weight:600;white-space:nowrap}
 .master-note{margin:8px 0 0;color:var(--ink-faint);font-size:12.5px;line-height:1.5}
 .namebar[hidden],.toolbar[hidden],.preview[hidden],.roster[hidden]{display:none}
 
@@ -395,7 +421,7 @@ pre#out .h{color:var(--accent)}
       <button type="button" id="projectDuplicate">Duplicate project</button>
       <hr>
       <button type="button" id="projectExport">Export project backup</button>
-      <button type="button" id="projectImport">Import project backup</button>
+      <button type="button" id="projectImport">Import project or lorebook</button>
       <hr>
       <button type="button" class="danger" id="projectDelete">Delete project</button>
     </div>
@@ -415,6 +441,7 @@ pre#out .h{color:var(--accent)}
     <button class="tab" role="tab" id="tab-history" aria-selected="false" data-mode="history">History</button>
     <button class="tab" role="tab" id="tab-concept" aria-selected="false" data-mode="concept">Concepts</button>
     <button class="tab" role="tab" id="tab-relationships" aria-selected="false" data-mode="relationships">Relationships</button>
+    <button class="tab" role="tab" id="tab-live" aria-selected="false" data-mode="live">Live</button>
     <button class="tab" role="tab" id="tab-guide" aria-selected="false" data-mode="guide">Guide</button>
     <button class="tab" role="tab" id="tab-credits" aria-selected="false" data-mode="credits">Credits</button>
   </div>
@@ -426,12 +453,14 @@ pre#out .h{color:var(--accent)}
     <button class="btn" id="btnSave">Save .json</button>
     <button class="btn" id="btnLoad">Load .json</button>
     <button class="btn" id="btnImportCharacter" type="button">Import character</button>
+    <button class="btn" id="btnPasteCharacter" type="button" title="Paste text and fill the fields on this tab">Paste text</button>
     <input type="file" id="externalCardFile" accept=".json,.png,.txt,.md,application/json,image/png,text/plain,text/markdown" hidden>
     <span id="cardImportStatus" role="status" aria-live="polite"></span>
     <button class="btn" id="btnClear">Clear card</button>
     <button class="btn primary" id="btnMaster">Export everything</button>
     <button class="btn" id="btnWipe">Clear project</button>
     <span id="saveStatus"></span>
+    <span id="liveBadge" hidden>● Live</span>
     <input type="file" id="fileIn" accept=".json,application/json" hidden>
   </div>
 </header>
@@ -636,6 +665,15 @@ pre#out .h{color:var(--accent)}
         <p class="hint">What stops the scene. Worth filling even if the list is short. A character with no limits reads as a prop.</p>
         <div class="rows" data-list="limitsNsfw"></div>
         <button class="add" data-add="limitsNsfw">+ Add limit</button>
+
+        <div class="field" style="margin-top:18px"><label>Masturbation</label></div>
+        <p class="hint">Optional. How they handle it alone. "How they feel about it" usually does the most work, since shame, secrecy, or ease all change how they act around a partner.</p>
+        <div class="grid2">
+          <div class="field"><label>Frequency</label><input data-k="soloFrequency" placeholder="Rarely, most nights, when stressed"></div>
+          <div class="field"><label>Where</label><input data-k="soloWhere" placeholder="Only in the shower, locked bedroom, anywhere they're alone"></div>
+        </div>
+        <div class="field"><label>What they think about</label><textarea data-k="soloFantasy" placeholder="A specific person, a scenario they'd never admit to, nothing in particular"></textarea></div>
+        <div class="field"><label>How they feel about it</label><textarea data-k="soloFeeling" placeholder="Guilty afterwards, completely unbothered, hides it carefully"></textarea></div>
       </div>
     </details>
 
@@ -1492,6 +1530,63 @@ pre#out .h{color:var(--accent)}
     </div>
   </div>
 
+  <!-- ============ LIVE ============ -->
+  <div class="pane credits live-pane" id="form-live" role="tabpanel" aria-labelledby="tab-live" hidden>
+    <div class="credits-inner live-inner">
+      <div class="g-eyebrow">Writer's Workbench</div>
+      <h1>Live sync</h1>
+      <p class="g-intro">Edits here go straight into a SillyTavern lorebook. The next message in SillyTavern uses them.</p>
+
+      <section class="live-card">
+        <div class="live-conn"><span class="live-dot" id="liveDot"></span><span id="liveConn">Checking for SillyTavern…</span></div>
+      </section>
+
+      <section class="live-card">
+        <h2>Lorebook</h2>
+        <div class="live-controls">
+          <select id="liveBookSelect" disabled><option value="">Waiting for SillyTavern…</option></select>
+          <button class="btn" id="liveRefresh" type="button" title="Reload the list of lorebooks from SillyTavern" disabled>↻</button>
+          <input id="liveBook" placeholder="new lorebook name" autocomplete="off" spellcheck="false" hidden>
+          <button class="btn" id="liveSwitch" type="button" hidden>Switch</button>
+        </div>
+        <label class="live-onoff"><input type="checkbox" id="liveToggle" disabled><span>Live</span></label>
+        <p class="live-status" id="liveStatus" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="live-card">
+        <h2>What to sync</h2>
+        <p class="hint">Side characters, locations, items, factions, history, and concepts always sync.</p>
+        <label class="toggle"><input type="checkbox" id="liveScenario" checked> Active scenario (always on in chat)</label>
+        <label class="toggle"><input type="checkbox" id="liveMain"> Main characters</label>
+        <label class="toggle"><input type="checkbox" id="liveRelationships" checked> Relationship graph (always on in chat)</label>
+        <p class="hint">Unticking something stops it syncing. It isn't removed from SillyTavern.</p>
+      </section>
+
+      <section class="live-card">
+        <h2>Activity</h2>
+        <div id="liveLog" class="live-log">Nothing synced yet.</div>
+      </section>
+
+      <section class="live-card">
+        <h2>Setup</h2>
+        <ol class="live-list">
+          <li>Install the Writer's Workbench Bridge extension in SillyTavern and reload it.</li>
+          <li>Open this page from SillyTavern's wand menu. Opened as a local file, live sync stays off.</li>
+          <li>Pick a lorebook above, or choose New lorebook, then tick Live.</li>
+          <li>Activate that lorebook once in SillyTavern's World Info.</li>
+          <li>Keep the SillyTavern tab open while you work.</li>
+        </ol>
+        <h2>What it touches</h2>
+        <ul class="live-list">
+          <li>Only the lorebook you pick, and only entries the Workbench made. Entries you wrote by hand are never changed.</li>
+          <li>Deleting something here removes its entry. Unticking it or pausing Live removes nothing.</li>
+          <li>Entries from another project in the same lorebook are left alone.</li>
+          <li>Editing a Workbench entry in SillyTavern's own editor gets overwritten by the next sync.</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+
   <!-- ============ GUIDE ============ -->
   <div class="pane credits guide" id="form-guide" role="tabpanel" aria-labelledby="tab-guide" hidden>
     <div class="credits-inner guide-inner">
@@ -2031,7 +2126,8 @@ function seg(st, kind, hide){
     block("contradiction", "Core Contradiction", g("contradiction"));
 
     const iC=g("intimacy"), iD=g("drawnTo"), iF=g("friction");
-    if(iC||iD||iF||listOf("kinks").length||listOf("limitsNsfw").length||!hide){
+    const soloAny = ["soloFrequency","soloWhere","soloFantasy","soloFeeling"].some(k=>g(k));
+    if(iC||iD||iF||listOf("kinks").length||listOf("limitsNsfw").length||soloAny||!hide){
       const parts=[];
       if(iC) parts.push("Core dynamic: "+iC);
       if(iD) parts.push("Drawn to:\n"+iD);
@@ -2039,6 +2135,10 @@ function seg(st, kind, hide){
       const kk=listOf("kinks"), kl=listOf("limitsNsfw");
       if(kk.length) parts.push("Kinks & turn-ons:\n"+kk.map(x=>"- "+x).join("\n"));
       if(kl.length) parts.push("Turn-offs & hard limits:\n"+kl.map(x=>"- "+x).join("\n"));
+      const solo = [["Frequency",g("soloFrequency")],["Where",g("soloWhere")],
+                    ["What they think about",g("soloFantasy")],["How they feel about it",g("soloFeeling")]]
+                    .filter(x=>x[1]).map(x=>x[0]+": "+x[1]);
+      if(solo.length) parts.push("Masturbation:\n"+solo.join("\n"));
       push("intimacy", "# "+P+" Intimacy & Vulnerability\n\n"+parts.join("\n\n"));
     }
 
@@ -2185,6 +2285,7 @@ function render(){
   hydrateLoreSettings(mode,false);
   updateCounts();
   renderRoster();
+  liveSchedule();
   if(mode==="location" && cur().fields.useMap) renderOverview();
   autosave();
 }
@@ -2197,7 +2298,7 @@ const COUNT_MAP = {
         triggers:["coreBelief","protectiveStrategy","emotionalNeed","changeCondition","knows","wrongBelief"],
         nsfwLook:["chest","hips","genitals","bodyHair","underwear","marks","scent","nsfwOther"],
         backstory:["backstory"], abilities:["abilities","weaknesses"], contradiction:["contradiction"],
-        intimacy:["intimacy","drawnTo","friction"], quirks:["quirks"],
+        intimacy:["intimacy","drawnTo","friction","soloFrequency","soloWhere","soloFantasy","soloFeeling"], quirks:["quirks"],
         personalGoal:["personalGoal"], voice:["tone"], notes:["notes"]},
   scenario:{setting:["location","genre","themes","setting"], story:["story","storyGoal","storyPressure"], tech:["techLabel","tech"], mood:["mood"], notes:["notes"]},
   location:{identity:["type","scale","partOf","keys"], map:[], vibe:["vibe"], access:["access"], traffic:["traffic"], time:["time"], notes:["notes"]},
@@ -2324,7 +2425,8 @@ function setMode(next){
   $("#form-relationships").hidden = (next!=="relationships");
   $("#form-credits").hidden = (next!=="credits");
   $("#form-guide").hidden   = (next!=="guide");
-  const isStatic = (next==="credits" || next==="guide" || next==="relationships");
+  $("#form-live").hidden    = (next!=="live");
+  const isStatic = (next==="credits" || next==="guide" || next==="relationships" || next==="live");
   $(".preview").hidden      = isStatic;
   $(".namebar").hidden      = isStatic || next==="scenario";
   $(".toolbar").hidden      = isStatic;
@@ -2536,13 +2638,15 @@ function entryHasContent(st, kind, hide){
   // more than the bare wrapper + identity name line
   return md.replace(/<[^>]+>/g,"").replace(/^Name: .*$/m,"").trim().length > 0;
 }
-function masterCollect(hide){
+function masterCollect(hide, pick){
   const rows = [];
-  if($("#masterScenario").checked){
+  const wantScenario = pick ? pick.scenario : $("#masterScenario").checked;
+  const wantMain     = pick ? pick.main     : $("#masterMain").checked;
+  if(wantScenario){
     const sc = S.scenario.list[S.scenario.active];
     if(sc && entryHasContent(sc,"scenario",hide)) rows.push({kind:"scenario", label:"Scenario", st:sc});
   }
-  if($("#masterMain").checked){
+  if(wantMain){
     S.main.list.forEach(st=>{ if(entryHasContent(st,"main",hide)) rows.push({kind:"main", label:"Main", st:st}); });
   }
   MASTER_KINDS.forEach(([kind,label])=>{
@@ -2598,6 +2702,300 @@ function masterExport(){
   const fname = slugify(name, "everything")+".json";
   download(JSON.stringify(book,null,2), fname, "application/json");
   toast("Downloaded "+fname+" ("+rows.length+" entries)");
+}
+
+
+/* ================= live sync with SillyTavern =================
+   Talks to the Writer's Workbench Bridge extension over a BroadcastChannel.
+   That only works when this page is served by SillyTavern (same origin), which is
+   what the bridge's "Open Writer's Workbench" does. As a local file it stays off. */
+const LIVE_CHANNEL = 'writers-workbench-bridge';
+let liveCh = null, liveReady = false, liveOn = false, liveTimer = null, livePoll = null;
+let liveLastHash = '', liveBusy = false, liveAgain = false, liveReq = 0;
+let liveTarget = '';   // the lorebook actually being synced; typing in the box doesn't change it
+let liveAdopt = false;  // link entries from an earlier Workbench export instead of duplicating them
+
+function liveConn(text, state){
+  const t = $("#liveConn"), d = $("#liveDot");
+  if(t) t.textContent = text;
+  if(d) d.className = 'live-dot' + (state ? ' '+state : '');
+}
+let liveLogLines = [];
+function liveLog(line){
+  const t = new Date();
+  liveLogLines.unshift(String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+':'+String(t.getSeconds()).padStart(2,'0')+'  '+line);
+  liveLogLines = liveLogLines.slice(0, 40);
+  const el = $("#liveLog"); if(el) el.textContent = liveLogLines.join('\n');
+}
+const LIVE_OPTS_KEY = 'writers-workbench-live-options';
+function liveSaveOptions(){
+  try{ localStorage.setItem(LIVE_OPTS_KEY, JSON.stringify({
+    scenario: $("#liveScenario").checked, main: $("#liveMain").checked, relationships: $("#liveRelationships").checked })); }catch(_){}
+}
+function liveLoadOptions(){
+  try{
+    const o = JSON.parse(localStorage.getItem(LIVE_OPTS_KEY) || 'null');
+    if(!o) return;
+    if(typeof o.scenario === 'boolean') $("#liveScenario").checked = o.scenario;
+    if(typeof o.main === 'boolean') $("#liveMain").checked = o.main;
+    if(typeof o.relationships === 'boolean') $("#liveRelationships").checked = o.relationships;
+  }catch(_){}
+}
+function liveStatus(text){ const el = $("#liveStatus"); if(el) el.textContent = text; }
+
+function liveInit(){
+  const toggle = $("#liveToggle");
+  if(!toggle) return;
+  liveLoadOptions();
+  ["liveScenario","liveMain","liveRelationships"].forEach(id=>$("#"+id).addEventListener('change', ()=>{
+    liveSaveOptions();
+    if(liveOn){ liveLastHash = ''; liveSchedule(); }
+  }));
+  $("#liveBadge").addEventListener('click', ()=>setMode('live'));
+  if(typeof BroadcastChannel === 'undefined' || location.protocol === 'file:'){
+    liveConn("Not connected. This page was opened as a local file.", 'bad');
+    liveStatus("Open it from SillyTavern's wand menu to sync live. Everything else in the Workbench works as normal.");
+    return;
+  }
+  const sel = $("#liveBookSelect"), nameBox = $("#liveBook"), switchBtn = $("#liveSwitch"), refresh = $("#liveRefresh");
+  const NEW_BOOK = '__new__';
+  let worlds = [];
+  let waiters = {}, reqSeq = 0;
+  const ask = (type, payload, ms)=>new Promise(resolve=>{
+    const id = ++reqSeq;
+    waiters[id] = resolve;
+    liveCh.postMessage(Object.assign({ type:type, requestId:id }, payload));
+    setTimeout(()=>{ if(waiters[id]){ delete waiters[id]; resolve(null); } }, ms || 5000);
+  });
+
+  /* the lorebook currently chosen in the controls (not necessarily the one being synced) */
+  const chosen = ()=> sel.value === NEW_BOOK ? (nameBox.value || '').trim() : sel.value;
+
+  const fillSelect = list=>{
+    worlds = (list || []).slice().sort((x,y)=>x.localeCompare(y));
+    const keep = liveTarget || sel.value || nameBox.value;
+    sel.replaceChildren();
+    const ph = new Option('Choose a lorebook…', ''); sel.appendChild(ph);
+    worlds.forEach(n=>sel.appendChild(new Option(n, n)));
+    sel.appendChild(new Option('＋ New lorebook…', NEW_BOOK));
+    if(keep && worlds.includes(keep)) sel.value = keep;
+    else if(keep && keep !== NEW_BOOK && (nameBox.value || '').trim()){ sel.value = NEW_BOOK; }
+    else sel.value = '';
+    nameBox.hidden = sel.value !== NEW_BOOK;
+    sel.disabled = false; refresh.disabled = false;
+  };
+
+  const inspect = book=>ask('inspect', { book:book }, 4000);
+
+  /* confirm a target, check it for an earlier import, then start or switch */
+  const commitTarget = async (book, switching)=>{
+    const info = await inspect(book);
+    const existing = info && info.exists;
+    const q1 = switching
+      ? 'Switch live sync from "'+liveTarget+'" to "'+book+'"?\n\n"'+liveTarget+'" stays as it is in SillyTavern.'+(existing ? '' : ' "'+book+'" will be created.')
+      : 'Start live sync into '+(existing ? 'the existing lorebook' : 'a new lorebook')+' "'+book+'"?'+(existing ? '\n\nOnly entries the Workbench makes will be changed.' : '');
+    if(!confirm(q1)) return false;
+    liveAdopt = false;
+
+    if(existing){
+      const read = await ask('read', { book:book }, 8000);
+      const all = read && read.data ? Object.values(read.data.entries || {}).filter(e=>e && typeof e === 'object') : [];
+      const mine = new Set(liveKnownIds());
+      const missing = all.filter(e=>typeof e.wwId !== 'string' || !mine.has(e.wwId)).length;
+      if(missing){
+        const pull = confirm('"'+book+'" has '+missing+(missing===1 ? ' entry' : ' entries')+' the Workbench doesn\'t have.\n\n'
+          + 'Import the whole lorebook into a new project and keep it in sync? Entries the Workbench didn\'t make go to Concepts and are rewritten in Workbench format on the first sync.\n\n'
+          + 'Cancel keeps your current project and syncs it into this lorebook alongside what\'s there.');
+        if(pull){
+          const r = lorebookToProjectState(Object.assign({ name:book }, read.data), { keepIds:true });
+          await flushProjectSave();
+          const rec = await createProject(book+' — Live', r.state);
+          await switchProject(rec.id, false);
+          const linked = await ask('link', { book:book, project:currentProjectId, links:r.links }, 8000);
+          if(!linked){ liveStatus('Imported, but linking to SillyTavern failed. Nothing was synced.'); return false; }
+          if(r.counts.main) $("#liveMain").checked = true;
+          if(r.relationships) $("#liveRelationships").checked = true;
+          liveSaveOptions();
+          const parts = Object.entries(r.counts).map(([k,n])=>n+' '+k);
+          toast('Imported "'+book+'" into a new project: '+parts.join(', ')+'.');
+          liveLog('Imported "'+book+'" into a new project: '+parts.join(', '));
+          liveTarget = book; liveLastHash = '';
+          return true;
+        }
+      }
+    }
+    if(info && info.adoptable){
+      const one = info.adoptable === 1;
+      liveAdopt = confirm('"'+book+'" has '+info.adoptable+(one ? ' entry that looks' : ' entries that look')+' like an earlier Workbench export.\n\nLink '+(one ? 'it' : 'them')+' so '+(one ? 'it updates' : 'they update')+' in place? If you choose Cancel, the Workbench adds its own copies next to '+(one ? 'it' : 'them')+'.');
+    }
+    liveTarget = book; liveLastHash = '';
+    return true;
+  };
+
+  const pending = ()=>{
+    nameBox.hidden = sel.value !== NEW_BOOK;
+    const v = chosen();
+    const differs = liveOn && v && v !== liveTarget;
+    switchBtn.hidden = !differs;
+    if(liveOn) liveStatus(differs ? 'Still syncing into "'+liveTarget+'". Press Switch to change to "'+v+'".'
+                                  : 'Syncing into "'+liveTarget+'".');
+  };
+
+  liveCh = new BroadcastChannel(LIVE_CHANNEL);
+  liveCh.onmessage = ev=>{
+    const m = ev.data || {};
+    if(m.type === 'ready'){
+      const first = !liveReady;
+      liveReady = true; toggle.disabled = false;
+      fillSelect(m.worlds);
+      if(first){
+        liveConn('Connected to SillyTavern'+(m.st ? ' '+m.st : '')+(m.version ? ' · bridge '+m.version : ''), 'ok');
+        if(!liveOn) liveStatus('Choose a lorebook, then tick Live.');
+      }
+    }
+    if(m.type === 'worlds'){ fillSelect(m.worlds); if(!liveOn) liveStatus('Lorebook list updated.'); }
+    if(m.type === 'inspected' || m.type === 'bookData' || m.type === 'linkedBook'){
+      const w = waiters[m.requestId];
+      if(w){ delete waiters[m.requestId]; w(m.error ? null : m); }
+    }
+    if(m.type === 'pushed'){
+      liveBusy = false;
+      const bits = [];
+      if(m.createdBook) bits.push('created the book');
+      if(m.adopted) bits.push(m.adopted+' linked');
+      if(m.created) bits.push(m.created+' added');
+      if(m.updated) bits.push(m.updated+' updated');
+      if(m.removed) bits.push(m.removed+' removed');
+      const t = new Date();
+      liveStatus('Synced into "'+m.book+'" '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+(bits.length ? ' · '+bits.join(', ') : ' · no changes'));
+      if(bits.length) liveLog(m.book+': '+bits.join(', '));
+      if(m.createdBook){
+        toast('Created "'+m.book+'" in SillyTavern. Activate it in World Info once.');
+        liveCh.postMessage({ type:'list' });
+      }
+      if(liveAgain){ liveAgain = false; livePush(); }
+    }
+    if(m.type === 'error'){
+      liveBusy = false; liveLastHash = '';
+      if(m.fatal){
+        liveReady = true;
+        toggle.disabled = true; toggle.checked = false; liveOn = false;
+        clearInterval(livePoll); $("#liveBadge").hidden = true;
+        liveStatus('Bridge problem: '+(m.message || 'unknown error'));
+        liveConn('Connected, but the bridge can\'t work here', 'bad');
+        liveLog('Problem: '+(m.message || 'unknown error'));
+      } else {
+        liveStatus('Sync failed: '+(m.message || 'unknown error'));
+        liveLog('Failed: '+(m.message || 'unknown error'));
+      }
+    }
+  };
+  let tries = 0;
+  const hello = ()=>{ if(liveReady || tries++ > 20) return; liveCh.postMessage({ type:'hello' }); setTimeout(hello, 1000); };
+  hello();
+  setTimeout(()=>{ if(!liveReady) liveConn('SillyTavern not answering', 'bad'); }, 2500);
+  setTimeout(()=>{ if(!liveReady) liveStatus('Bridge not answering. Check that the extension is enabled in SillyTavern\'s Extensions panel, that its SillyTavern tab is still open, and that this page was opened from the wand menu. Then reload this page.'); }, 2500);
+
+  refresh.addEventListener('click', ()=>liveCh.postMessage({ type:'list' }));
+
+  toggle.addEventListener('change', async ()=>{
+    if(toggle.checked){
+      const book = chosen();
+      if(!book){
+        toggle.checked = false;
+        liveStatus(sel.value === NEW_BOOK ? 'Type a name for the new lorebook first.' : 'Choose a lorebook first.');
+        (sel.value === NEW_BOOK ? nameBox : sel).focus();
+        return;
+      }
+      toggle.disabled = true;
+      const ok = await commitTarget(book, false);
+      toggle.disabled = false;
+      if(!ok){ toggle.checked = false; return; }
+      liveOn = true;
+      $("#liveBadge").hidden = false;
+      liveConn('Live: syncing into "'+liveTarget+'"', 'on');
+      liveLog('Started syncing into "'+liveTarget+'"');
+      liveStatus('Starting…');
+      livePush();
+      livePoll = setInterval(livePush, 3000);
+    } else {
+      liveOn = false; clearInterval(livePoll); clearTimeout(liveTimer);
+      $("#liveBadge").hidden = true; switchBtn.hidden = true;
+      liveConn('Connected to SillyTavern · paused', 'ok');
+      liveLog('Paused');
+      liveStatus('Paused. Nothing in SillyTavern was removed.');
+    }
+  });
+
+  const confirmSwitch = async ()=>{
+    if(!liveOn) return;
+    const v = chosen();
+    if(!v || v === liveTarget){ pending(); return; }
+    const ok = await commitTarget(v, true);
+    if(ok){ switchBtn.hidden = true; liveConn('Live: syncing into "'+liveTarget+'"', 'on'); liveLog('Switched to "'+liveTarget+'"'); liveStatus('Switching to "'+v+'"…'); livePush(); }
+    else {
+      if(worlds.includes(liveTarget)){ sel.value = liveTarget; nameBox.hidden = true; }
+      else { sel.value = NEW_BOOK; nameBox.value = liveTarget; }
+      pending();
+    }
+  };
+  sel.addEventListener('change', ()=>{ pending(); if(sel.value === NEW_BOOK) nameBox.focus(); });
+  nameBox.addEventListener('input', pending);
+  nameBox.addEventListener('keydown', e=>{ if(e.key === 'Enter'){ e.preventDefault(); if(liveOn) confirmSwitch(); } });
+  switchBtn.addEventListener('click', confirmSwitch);
+}
+
+function liveEntries(){
+  const hide = $("#hideEmpty").checked;
+  const rows = masterCollect(hide, { scenario: $("#liveScenario").checked, main: $("#liveMain").checked });
+  const entries = rows.map((r,i)=>{
+    if(!r.st.id) r.st.id = wwId(r.kind);
+    const e = lorebookEntry(i, r.st, hide, r.kind);
+    e.comment = "["+r.label+"] "+e.comment;
+    e.wwId = r.st.id;
+    delete e.uid; delete e.displayIndex;
+    return e;
+  });
+  const relCount = window.wwRelationshipCount ? window.wwRelationshipCount() : 0;
+  if($("#liveRelationships").checked && relCount){
+    const r = lorebookEntry(0, {name:'Relationships', fields:{}, lists:{}}, hide, 'scenario');
+    r.content = window.wwRelationshipMarkdown().trim();
+    r.comment = "[Cast] Relationships";
+    r.constant = true; r.selective = false; r.key = [];
+    r.wwId = 'ww-relationships';
+    delete r.uid; delete r.displayIndex;
+    entries.push(r);
+  }
+  return entries;
+}
+
+function liveKnownIds(){
+  const ids = [];
+  Object.keys(S).forEach(k=>(S[k].list||[]).forEach(st=>{ if(!st.id) st.id = wwId(k); ids.push(st.id); }));
+  if(window.wwRelationshipCount && window.wwRelationshipCount()) ids.push('ww-relationships');
+  return ids;
+}
+
+function livePush(){
+  if(!liveOn || !liveCh || !liveReady) return;
+  if(liveBusy){ liveAgain = true; return; }
+  const book = liveTarget;
+  if(!book) return;
+  let entries;
+  try{ entries = liveEntries(); }catch(err){ liveStatus('Could not build entries: '+err.message); return; }
+  const hash = book + '|' + JSON.stringify(entries);
+  if(hash === liveLastHash) return;
+  liveLastHash = hash;
+  liveBusy = true;
+  liveCh.postMessage({ type:'push', requestId: ++liveReq, book: book, entries: entries, prune: true, adopt: liveAdopt,
+                       project: currentProjectId || 'default', knownIds: liveKnownIds() });
+  setTimeout(()=>{ if(liveBusy){ liveBusy = false; liveLastHash = ''; liveStatus('No answer from SillyTavern. Is its tab still open?'); } }, 8000);
+}
+
+function liveSchedule(){
+  if(!liveOn) return;
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(livePush, 700);
 }
 
 function lorebookSlug(){
@@ -2661,7 +3059,8 @@ $("#btnLoad").addEventListener("click", ()=> $("#fileIn").click());
 
 function coerce(d, kind){
   const fresh = blankState(kind);
-  if((kind==="main" || kind==="side" || kind==="location") && typeof d.id==="string" && d.id) fresh.id = d.id;
+  /* every kind keeps its id: live sync and relationships identify entries by it */
+  if(typeof d.id==="string" && d.id) fresh.id = d.id;
   fresh.name = typeof d.name==="string" ? d.name : "";
   fresh.fields = (d.fields && typeof d.fields==="object") ? d.fields : {};
   LIST_KEYS[kind].forEach(k=>{
@@ -3915,7 +4314,7 @@ const ACTIVE_PROJECT_KEY = "writers-workbench-active-project-v1";
 const PROJECT_DB_NAME = "writers-workbench-projects";
 const PROJECT_STORE = "projects";
 const PROJECT_DB_VERSION = 1;
-const LORE_IDS = ["masterName","lorebookNameMain","lorebookName","lorebookNameLoc","lorebookNameItem","lorebookNameFac","lorebookNameHist","lorebookNameCon"];
+const LORE_IDS = ["liveBook","masterName","lorebookNameMain","lorebookName","lorebookNameLoc","lorebookNameItem","lorebookNameFac","lorebookNameHist","lorebookNameCon"];
 
 let projectDB = null;
 let currentProjectId = "";
@@ -4154,6 +4553,109 @@ async function exportProjectBackup(){
   toast("Exported project backup");
 }
 
+
+/* ================= import a SillyTavern lorebook as a project =================
+   Workbench exports carry enough to rebuild from: the "[Location]" label in each
+   entry's comment says which tab, and the XML section tags say which field. The
+   paste detector does the field work. Entries from other lorebooks land in Concepts. */
+const LB_KIND = { character:'side', main:'main', location:'location', item:'item',
+                  faction:'faction', history:'history', concept:'concept', scenario:'scenario' };
+
+function applyProposalsTo(st, kind, props){
+  props.forEach(p=>{
+    const a = p.apply;
+    if(a.kind === 'name'){ if(kind !== 'scenario') st.name = a.value; }
+    else if(a.kind === 'field') st.fields[a.key] = a.value;
+    else if(a.kind === 'append') st.fields[a.key] = (st.fields[a.key] ? st.fields[a.key]+'\n\n' : '') + a.value;
+    else if(a.kind === 'list') st.lists[a.key] = (st.lists[a.key]||[]).filter(x=>String(x).trim()).concat(a.value);
+    if(['coat','ears','tail','muzzle','pawsHands','stance','anthroOther'].includes(a.key)) st.fields.useAnthro = true;
+  });
+}
+
+function loreSettingsFromEntry(e, st, kind){
+  const raw = {};
+  WI_FIELDS.forEach(([,fields])=>fields.forEach(([key])=>{ if(key in e) raw[key] = e[key]; }));
+  const alwaysOnByDefault = (kind === 'scenario');
+  raw.activation = e.constant ? (alwaysOnByDefault ? 'default' : 'constant')
+                              : (alwaysOnByDefault ? 'keywords' : 'default');
+  const auto = wiAutomaticKeys(st, kind);
+  const keys = Array.isArray(e.key) ? e.key.filter(k=>typeof k === 'string') : [];
+  const same = keys.length === auto.length && keys.every(k=>auto.includes(k));
+  raw.keyMode = same ? 'auto' : 'custom';
+  raw.key = same ? [] : keys;
+  const out = wiNormalize(raw);
+  // store nothing when every setting is the default
+  const defaults = wiNormalize({});
+  return JSON.stringify(out) === JSON.stringify(defaults) ? null : out;
+}
+
+function lorebookToProjectState(book, opts){
+  opts = opts || {};
+  const links = [];
+  const state = emptyProjectState();
+  const lists = {}; Object.keys(S).forEach(k=>{ lists[k] = []; });
+  const relLines = [];
+  const counts = {}, foreign = [];
+  const entries = Object.values(book.entries || {}).filter(e=>e && typeof e === 'object')
+    .sort((a,b)=>(a.displayIndex ?? a.uid ?? 0) - (b.displayIndex ?? b.uid ?? 0));
+
+  entries.forEach(e=>{
+    const comment = String(e.comment || '').trim();
+    const content = String(e.content || '');
+    const m = comment.match(/^\[([A-Za-z]+)\]\s*(.*)$/);
+    const label = m ? m[1].toLowerCase() : '';
+    const title = m ? m[2].trim() : comment;
+
+    if(label === 'cast' || /^\s*<relationships>/.test(content)){
+      if(e.uid !== undefined) links.push({ uid:e.uid, wwId:'ww-relationships' });
+      content.split(/\r?\n/).forEach(line=>{
+        const r = line.match(/^\s*(.+?) to (.+?):\s*(.+?)\s*$/);
+        if(r) relLines.push({ from:r[1].trim(), to:r[2].trim(), label:r[3].trim() });
+      });
+      return;
+    }
+
+    let kind = LB_KIND[label];
+    if(!kind && /^\s*<scenario>/.test(content)) kind = 'scenario';
+    if(!kind){ kind = 'concept'; foreign.push(title || (e.key && e.key[0]) || 'Untitled'); }
+
+    const st = blankState(kind);
+    st.id = (opts.keepIds && typeof e.wwId === 'string' && e.wwId) ? e.wwId : wwId(kind);
+    if(e.uid !== undefined) links.push({ uid:e.uid, wwId:st.id });
+    applyProposalsTo(st, kind, parsePastedCharacter(content, kind));
+    if(kind !== 'scenario' && !String(st.name||'').trim()){
+      st.name = title || (Array.isArray(e.key) && e.key[0]) || 'Untitled';
+    }
+    const hasAny = Object.values(st.fields).some(v=>String(v||'').trim()) ||
+                   Object.values(st.lists).some(l=>(l||[]).some(x=>String(x).trim()));
+    if(!hasAny && content.trim()) st.fields[pasteDefaultField(kind)] = content.trim();
+    const ls = loreSettingsFromEntry(e, st, kind);
+    if(ls) st.loreSettings = ls;
+    lists[kind].push(st);
+    counts[kind] = (counts[kind] || 0) + 1;
+  });
+
+  Object.keys(S).forEach(k=>{ if(lists[k].length) state.rosters[k] = { list:lists[k], active:0 }; });
+
+  /* rebuild the relationship graph from "A to B: label" lines */
+  const byName = {};
+  ['main','side'].forEach(k=>lists[k].forEach(st=>{ const n = String(st.name||'').trim(); if(n) byName[n] = st.id; }));
+  const used = new Set(), rels = [];
+  relLines.forEach((r,i)=>{
+    if(used.has(i)) return;
+    const from = byName[r.from], to = byName[r.to];
+    if(!from || !to) return;
+    const back = relLines.findIndex((q,j)=>j !== i && !used.has(j) && q.from === r.to && q.to === r.from && q.label === r.label);
+    if(back > -1) used.add(back);
+    used.add(i);
+    rels.push({ id:wwId('rel'), from:from, to:to, label:r.label, reciprocal: back > -1 });
+  });
+  state.relationships = rels;
+  state.lore.masterName = typeof book.name === 'string' ? book.name : '';
+  state.mode = Object.keys(S).find(k=>lists[k].length) || 'main';
+  return { state, counts, foreign, relationships: rels.length, total: entries.length, links };
+}
+
 async function importProjectBackupFile(file){
   const text=await file.text();
   let d;
@@ -4161,7 +4663,21 @@ async function importProjectBackupFile(file){
   let name,state;
   if(d && d.format==="writers-workbench-project" && d.project && d.project.state){ name=d.project.name; state=d.project.state; }
   else if(d && d.rosters){ name=(file.name||"Imported Project").replace(/\.wwproject\.json$|\.json$/i,""); state=d; }
-  else throw new Error("Not a Writer's Workbench project backup");
+  else if(d && d.entries && typeof d.entries==="object" && !Array.isArray(d.entries)){
+    const r = lorebookToProjectState(d);
+    if(!r.total) throw new Error("That lorebook has no entries");
+    name = (d.name || (file.name||"Imported lorebook").replace(/\.json$/i,""));
+    state = r.state;
+    await flushProjectSave();
+    const rec0 = await createProject(name+" — From lorebook", state);
+    await switchProject(rec0.id,false);
+    const parts = Object.entries(r.counts).map(([k,n])=>n+" "+({side:"side character",main:"main character",location:"location",item:"item",faction:"faction",history:"history entry",concept:"concept",scenario:"scenario"}[k]||k)+(n===1?"":"s"));
+    if(r.relationships) parts.push(r.relationships+" relationship"+(r.relationships===1?"":"s"));
+    toast("Imported "+parts.join(", "));
+    if(r.foreign.length) setTimeout(()=>toast(r.foreign.length+" entr"+(r.foreign.length===1?"y wasn't":"ies weren't")+" made by the Workbench, so "+(r.foreign.length===1?"it went":"they went")+" to Concepts"), 2600);
+    return;
+  }
+  else throw new Error("Not a Workbench project backup or a SillyTavern lorebook");
   await flushProjectSave();
   const rec=await createProject((name||"Imported Project")+" — Imported",state);
   await switchProject(rec.id,false);
@@ -4279,6 +4795,7 @@ $("#btnMaster").addEventListener("click", ()=>{
 });
 $("#masterClose").addEventListener("click", ()=>{ $("#masterPanel").hidden = true; });
 $("#masterGo").addEventListener("click", masterExport);
+liveInit();
 ["masterScenario","masterMain","masterRelationships"].forEach(id=> $("#"+id).addEventListener("change", masterSummary));
 
 $("#btnWipe").addEventListener("click", async ()=>{
@@ -4601,6 +5118,514 @@ function addImportedCharacter(imported,kind='main'){
   const st=blankState(kind);st.name=imported.working.name||'Imported character';st.imported=imported;
   S[kind].list.push(st);S[kind].active=S[kind].list.length-1;importedMoveUndo=null;setMode(kind);
 }
+
+/* ================= paste text, detect fields ================= */
+/* Everything here runs locally. Nothing is guessed from prose: a value is only
+   taken when it sits under a recognised heading, XML tag, or "Label: value" line. */
+
+/* section name (lowercased, spaces or underscores) -> where it goes */
+const PASTE_SECTIONS_CHAR = {
+  'identity':'kv', 'basics':'kv', 'overview':'kv',
+  'current status':'field:statusWhere', 'status':'field:statusWhere',
+  'appearance':'kv>field:vibe', 'appearance and vibe':'kv>field:vibe', 'appearance & vibe':'kv>field:vibe',
+  'look':'field:look',
+  'body':'kv>field:nsfwOther', 'body and intimate details':'kv>field:nsfwOther', 'intimate details':'kv>field:nsfwOther',
+  'non human features':'kv>field:anthroOther', 'anthro':'kv>field:anthroOther',
+  'presence':'field:presence', 'presence and body language':'field:presence', 'body language':'field:presence',
+  'backstory':'field:backstory', 'background':'field:backstory', 'history':'field:backstory',
+  'abilities':'field:abilities', 'skills':'field:abilities', 'abilities and skills':'field:abilities',
+  'abilities skills and weaknesses':'field:abilities', 'weaknesses':'field:weaknesses',
+  'personality':'list:tags', 'personality tags':'list:tags', 'traits':'list:tags',
+  'psychology':'list:triggers', 'psychology and behavioral triggers':'list:triggers',
+  'behavioral triggers':'list:triggers', 'triggers':'list:triggers', 'behavior':'list:triggers',
+  'core contradiction':'field:contradiction', 'contradiction':'field:contradiction',
+  'intimacy':'field:intimacy', 'intimacy and vulnerability':'field:intimacy',
+  'romantic and intimate dynamics':'field:intimacy', 'sexual':'field:intimacy',
+  'hobbies':'list:hobbies', 'hobbies and interests':'list:hobbies', 'interests':'list:hobbies',
+  'likes':'list:likes', 'dislikes':'list:dislikes', 'fears':'list:fears',
+  'likes dislikes and fears':'kv', 'likes and dislikes':'kv',
+  'quirks':'field:quirks', 'quirk':'field:quirks',
+  'personal goal':'field:personalGoal', 'goals':'field:personalGoal',
+  'relationships':'list:relationships',
+  'voice':'kv>field:tone', 'voice and example dialogue':'kv>field:tone', 'example dialogue':'list:dialogue',
+  'dialogue':'list:dialogue', 'notes':'field:notes',
+  'want':'field:want', 'function in the story':'field:function', 'role':'field:role'
+};
+
+/* "Label: value" inside a section or at top level */
+const PASTE_LABELS_CHAR = {
+  'name':'@name', 'full name':'fullName', 'aliases':'aliases', 'alias':'aliases',
+  'age':'age', 'race':'race', 'species':'species', 'gender':'race',
+  'sexual orientation':'orientation', 'orientation':'orientation', 'sexuality':'orientation',
+  'occupation':'occupation', 'job':'occupation', 'goal':'goal', 'role':'role',
+  'height':'height', 'skin':'skin', 'eyes':'eyes', 'hair':'hair', 'face':'face',
+  'body':'body', 'body type':'body', 'build':'body',
+  'usual clothes':'clothes', 'clothes':'clothes', 'clothing':'clothes', 'outfit':'clothes',
+  'overall vibe':'vibe', 'vibe':'vibe',
+  'tone':'tone', 'scale':'scale', 'type':'type', 'part of':'partOf',
+  'where they are now':'statusWhere', 'how they feel about it':'statusFeel',
+  'core belief':'coreBelief', 'protective strategy':'protectiveStrategy',
+  'emotional need':'emotionalNeed', 'conditions for change':'changeCondition',
+  'knows':'knows', 'wrongly believes':'wrongBelief',
+  'core dynamic':'intimacy', 'drawn to':'drawnTo', 'friction points':'friction',
+  'chest':'chest', 'hips':'hips', 'hips and rear':'hips', 'genitals':'genitals',
+  'body and pubic hair':'bodyHair', 'pubic hair':'bodyHair', 'usual underwear':'underwear',
+  'underwear':'underwear', 'marks':'marks', 'scent':'scent', 'scent and skin':'scent',
+  'coat':'coat', 'ears':'ears', 'tail':'tail', 'muzzle':'muzzle', 'muzzle and teeth':'muzzle',
+  'hands and feet':'pawsHands', 'build and stance':'stance',
+  'abilities/skills':'abilities', 'weaknesses':'weaknesses',
+  'presence':'presence', 'quirks':'quirks', 'notes':'notes',
+  'frequency':'soloFrequency', 'what they think about':'soloFantasy', 'how they feel about it':'soloFeeling',
+  'backstory':'backstory', 'background':'backstory', 'abilities':'abilities',
+  'skills':'abilities', 'personality':'@tags', 'want':'want',
+  'core contradiction':'contradiction', 'contradiction':'contradiction'
+};
+const PASTE_LIST_LABELS_CHAR = {
+  'likes':'likes', 'dislikes':'dislikes', 'fears':'fears',
+  'kinks':'kinks', 'kinks and turn ons':'kinks',
+  'turn offs and hard limits':'limitsNsfw', 'hard limits':'limitsNsfw',
+  'example dialogue':'dialogue', 'personality tags':'tags', 'hobbies':'hobbies'
+};
+
+const pasteNorm = s => s.toLowerCase().replace(/['’]s\b/g,'').replace(/[_\-]+/g,' ')
+  .replace(/[^a-z0-9 &]/g,' ').replace(/\s*&\s*/g,' and ').replace(/\s+/g,' ').trim();
+
+
+/* ---- per-tab maps, read from the tab itself ----
+   Every field label, list, section title and XML section tag in a tab becomes
+   something the detector recognises, so each tab works without a hand-written map. */
+let PM = { sections:PASTE_SECTIONS_CHAR, labels:PASTE_LABELS_CHAR, listLabels:PASTE_LIST_LABELS_CHAR };
+
+function pasteMapsFor(kind){
+  const sections = {}, labels = {}, listLabels = {};
+  const form = document.getElementById('form-'+kind);
+  const reg = (map, key, val)=>{ const k = pasteNorm(key||''); if(k && !(k in map)) map[k] = val; };
+
+  if(form){
+    form.querySelectorAll('details.sec').forEach(sec=>{
+      if(sec.classList.contains('paste-panel') || sec.classList.contains('imported-panel')) return;
+      const sum = sec.querySelector('summary');
+      if(!sum) return;
+      const title = (sum.childNodes[0] && sum.childNodes[0].textContent || '').trim();
+      const fields = [...sec.querySelectorAll('[data-k]:not([data-bool])')].filter(el=>el.tagName!=='SELECT' || el.dataset.k==='scale');
+      const areas  = fields.filter(el=>el.tagName==='TEXTAREA');
+      const lists  = [...sec.querySelectorAll('[data-list]')].map(el=>el.dataset.list);
+
+      let target;
+      if(lists.length && !areas.length && fields.length <= 1 && lists.length === 1) target = 'list:'+lists[0];
+      else if(fields.length === 1 && !lists.length) target = 'field:'+fields[0].dataset.k;
+      else {
+        const dest = areas[0] || fields[0];
+        target = dest ? 'kv>field:'+dest.dataset.k : 'kv';
+      }
+      reg(sections, title, target);
+
+      /* the XML tag suffix this section exports under, e.g. ways_in_and_out */
+      const countEl = sum.querySelector('.count[data-for]');
+      const pushKey = countEl && countEl.dataset.for;
+      if(pushKey && typeof sectionTag === 'function') reg(sections, sectionTag(kind, pushKey), target);
+
+      /* each field's own label, and the first part of "Era / label" style labels */
+      fields.forEach(el=>{
+        const lab = el.closest('.field') && el.closest('.field').querySelector('label');
+        const text = lab ? (lab.childNodes[0] ? lab.childNodes[0].textContent : lab.textContent) : '';
+        reg(labels, text, el.dataset.k);
+        reg(labels, text.split(/[\/:(]/)[0], el.dataset.k);
+        reg(labels, el.dataset.k.replace(/([a-z])([A-Z])/g,'$1 $2'), el.dataset.k);
+      });
+
+      /* lists: the label right above the rows, the list key, and a single-list section title */
+      lists.forEach(lk=>{
+        const rows = sec.querySelector('[data-list="'+lk+'"]');
+        let prev = rows && rows.previousElementSibling;
+        while(prev && prev.classList.contains('hint')) prev = prev.previousElementSibling;
+        const lab = prev && prev.classList.contains('field') && prev.querySelector('label');
+        if(lab) reg(listLabels, lab.textContent, lk);
+        reg(listLabels, lk.replace(/([a-z])([A-Z])/g,'$1 $2'), lk);
+        if(lists.length === 1) reg(listLabels, title, lk);
+      });
+    });
+  }
+
+  /* exported identity labels that differ from the form labels */
+  const extraLabels = { location:'location', genre:'genre', themes:'themes', era:'techLabel',
+    'kept at':'keptAt', 'carried by':'carriedBy', 'size and reach':'reach', territory:'territory',
+    when:'when', where:'where', category:'category', 'who knows about it':'scope',
+    'what really happened':'event', 'what people say happened':'officialAccount',
+    "what's going on":'story', 'whats going on':'story', "what it's driving toward":'storyGoal',
+    'what its driving toward':'storyGoal', 'if nobody acts':'storyPressure' };
+  Object.entries(extraLabels).forEach(([k,v])=>reg(labels, k, v));
+
+  /* characters keep their hand-tuned maps on top */
+  if(kind === 'main' || kind === 'side'){
+    const exists = key=>!!(form && form.querySelector('[data-k="'+key+'"], [data-list="'+key+'"]'));
+    const fits = target=>{
+      if(typeof target !== 'string') return true;
+      if(target === 'kv' || target.startsWith('@')) return true;
+      const k = target.split(':').pop();
+      return exists(k);
+    };
+    const keep = src=>Object.fromEntries(Object.entries(src).filter(([,v])=>fits(v)));
+    return {
+      sections:   Object.assign({}, sections, keep(PASTE_SECTIONS_CHAR)),
+      labels:     Object.assign({}, labels,   keep(PASTE_LABELS_CHAR)),
+      listLabels: Object.assign({}, listLabels, keep(PASTE_LIST_LABELS_CHAR))
+    };
+  }
+  return { sections, labels, listLabels };
+}
+
+/* does a field or list with this key exist on the tab? */
+function pasteHasField(kind, key){
+  const form = document.getElementById('form-'+kind);
+  return !!(form && form.querySelector('[data-k="'+key+'"]'));
+}
+
+/* strip a leading "Name's " from a heading so "Kou's Backstory" matches "backstory" */
+function pasteSectionKey(title, name){
+  let t = pasteNorm(title);
+  if(name){ const n = pasteNorm(name); if(n && t.startsWith(n+' ')) t = t.slice(n.length+1); }
+  return t;
+}
+
+/* split pasted text into {title, body} blocks using XML tags or markdown headings */
+function pasteBlocks(text, name){
+  const blocks = [];
+  const all = [...text.matchAll(/<([A-Za-z0-9_.\-]+)>\s*\n([\s\S]*?)\n<\/\1>/g)];
+  // Section tags contain "_" (e.g. <Kou_backstory>). If any exist, use only those:
+  // the outer <Kou> wrapper would otherwise swallow the whole card as one block.
+  const sections = [...text.matchAll(/<([A-Za-z0-9.\-]+_[A-Za-z0-9_]+)>\s*\n([\s\S]*?)\n<\/\1>/g)];
+  const use = sections.length ? sections : all;
+  if(use.length){
+    use.forEach(m=>{
+      const tag = m[1], under = tag.indexOf('_');
+      blocks.push({ title: under > -1 ? tag.slice(under+1) : tag, body: m[2] });
+    });
+    return blocks;
+  }
+  /* A line is a heading when it is marked up (#, **bold**, "Label:") or when the
+     bare line names a section we know. No guessing from ordinary prose. */
+  const heads = [];
+  const re = /^(?:#{1,6}[ \t]+(.+?)|\*\*(.+?)\*\*:?|([A-Z][A-Za-z '’&\/-]{2,40}):|([A-Z][A-Za-z '’&\/-]{2,45}))[ \t]*$/gm;
+  let m;
+  while((m = re.exec(text)) !== null){
+    const title = (m[1]||m[2]||m[3]||m[4]||'').trim();
+    if(m[4] && !PM.sections[pasteSectionKey(title, name)]) continue;  // bare line: known sections only
+    heads.push({ title: title, index: m.index, len: m[0].length });
+  }
+  heads.forEach((h,i)=>{
+    const start = h.index + h.len;
+    const end = i+1 < heads.length ? heads[i+1].index : text.length;
+    blocks.push({ title: h.title, body: text.slice(start, end) });
+  });
+  return blocks;
+}
+
+function pasteBullets(body){
+  const out = [];
+  body.split(/\r?\n/).forEach(line=>{
+    const m = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
+    if(m && m[1].trim()) out.push(m[1].trim());
+  });
+  return out;
+}
+
+/* pull "Label: value" pairs, returning the leftover prose too */
+function pasteKeyValues(body, kind, name){
+  const fields = {}, lists = {}, leftover = [];
+  let pendingList = null, pendingField = null;
+  body.split(/\r?\n/).forEach(line=>{
+    const bullet = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
+    const labelOnly = line.match(/^\s*([A-Za-z][A-Za-z '’&\/-]{1,40})\s*:\s*$/);
+    if(pendingField && line.trim() && !labelOnly && !/^\s*[A-Za-z][A-Za-z '’&\/-]{1,40}\s*:\s*\S/.test(line)){
+      fields[pendingField] = (fields[pendingField] ? fields[pendingField]+'\n' : '') + line.trim();
+      return;
+    }
+    if(!line.trim()){ pendingField = null; }
+    if(bullet && pendingList){
+      (lists[pendingList] = lists[pendingList] || []).push(bullet[1].trim());
+      return;
+    }
+    const kv = line.match(/^\s*([A-Za-z][A-Za-z '’&\/-]{1,40})\s*:\s*(.*)$/);
+    if(kv){
+      const key = pasteSectionKey(kv[1], name), val = kv[2].trim();
+      if(PM.listLabels[key]){
+        pendingList = PM.listLabels[key];
+        if(val) (lists[pendingList] = lists[pendingList] || []).push(val);
+        return;
+      }
+      pendingList = null; pendingField = null;
+      if(PM.labels[key] && PM.labels[key] !== '@tags' && PM.labels[key] !== '@name' && !val){
+        pendingField = PM.labels[key];
+        return;
+      }
+      if(PM.labels[key] === '@tags' && val){
+        (lists.tags = lists.tags || []).push(...val.split(/[,;]/).map(x=>x.trim()).filter(Boolean));
+        return;
+      }
+      if(PM.labels[key] && val){ fields[PM.labels[key]] = val; return; }
+    }
+    if(bullet) { pendingList = null; leftover.push(line); return; }
+    if(line.trim()) { pendingList = null; leftover.push(line); }
+  });
+  return { fields, lists, leftover: leftover.join('\n').trim() };
+}
+
+/* main parser: text -> proposed changes */
+function parsePastedCharacter(text, kind){
+  PM = pasteMapsFor(kind);
+  const proposals = [];   // {label, apply:{kind:'field'|'list'|'name', key, value}, preview}
+  let name = '';
+
+  const nameLine = text.match(/^\s*(?:##?\s*)?(?:Name|name)\s*:\s*(.+)$/m);
+  if(nameLine) name = nameLine[1].trim();
+  if(!name){
+    const wrapper = text.match(/<([A-Za-z0-9.\-]+)>\s*\n/);
+    if(wrapper && !wrapper[1].includes('_')) name = wrapper[1].replace(/([a-z])([A-Z])/g,'$1 $2');
+  }
+  if(!name){
+    const h1 = text.match(/^##?\s+([^\n#].*)$/m);
+    if(h1) name = h1[1].trim();
+  }
+  if(name && kind === 'scenario') name = '';
+  if(name) proposals.push({label:'Name', apply:{kind:'name', value:name}, preview:name});
+
+  const blocks = pasteBlocks(text, name);
+
+  const pushField = (key, value, label)=>{
+    if(!key || !value || !String(value).trim()) return;
+    proposals.push({label:label, apply:{kind:'field', key:key, value:String(value).trim()}, preview:String(value).trim()});
+  };
+  const pushList = (key, arr, label)=>{
+    const clean = (arr||[]).map(x=>String(x).trim()).filter(Boolean);
+    if(!clean.length) return;
+    proposals.push({label:label, apply:{kind:'list', key:key, value:clean}, preview:clean.join(' · ')});
+  };
+
+  const seen = new Set();
+  blocks.forEach(b=>{
+    const key = pasteSectionKey(b.title, name);
+    const target = PM.sections[key];
+    const body = (b.body||'').trim();
+    if(!body) return;
+
+    const kvDest = (target||'').startsWith('kv>') ? target.slice(3) : null;
+    if(target === 'kv' || kvDest || !target){
+      const { fields, lists, leftover } = pasteKeyValues(body, kind, name);
+      Object.entries(fields).forEach(([k,v])=>{
+        if(k === '@name'){ if(!name){ name = v; proposals.push({label:'Name', apply:{kind:'name', value:v}, preview:v}); } return; }
+        if(seen.has('f:'+k)) return; seen.add('f:'+k);
+        pushField(k, v, prettyLabel(k));
+      });
+      Object.entries(lists).forEach(([k,v])=>{ if(!seen.has('l:'+k)){ seen.add('l:'+k); pushList(k, v, prettyLabel(k)); } });
+      const isNameHeading = !key || (name && key === pasteSectionKey(name, ''));
+      if(kvDest && leftover){
+        const dk = kvDest.split(':')[1];
+        if(!seen.has('f:'+dk)){ seen.add('f:'+dk); pushField(dk, leftover, prettyLabel(dk)); }
+      } else if(isNameHeading && leftover){
+        const dk0 = (kind==='main'||kind==='side') ? 'backstory' : pasteDefaultField(kind);
+        if(!seen.has('f:'+dk0)){
+          seen.add('f:'+dk0);
+          pushField(dk0, leftover, prettyLabel(dk0)+' (unlabelled text)');
+        } else {
+          proposals.push({label:'Notes (leftover text)', apply:{kind:'append', key:'notes', value:leftover},
+            preview:leftover.slice(0,140)});
+        }
+      } else if(!target && leftover && key && !isNameHeading) {
+        // an unrecognised section keeps its heading and goes to Notes
+        proposals.push({label:'Notes (from "'+b.title.trim()+'")', apply:{kind:'append', key:'notes',
+          value:b.title.trim()+'\n'+leftover}, preview:leftover.slice(0,140)});
+      }
+      return;
+    }
+
+    const [type, k] = target.split(':');
+    if(type === 'list'){
+      const isLabelled = line=>{
+        const m = line.match(/^\s*([A-Za-z][A-Za-z '’&\/-]{1,40})\s*:\s*/);
+        if(!m) return false;
+        const lk = pasteSectionKey(m[1], name);
+        return !!(PM.labels[lk] || PM.listLabels[lk]);
+      };
+      const bullets = pasteBullets(body).filter(x=>!isLabelled(x));
+      const items = (bullets.length ? bullets
+        : body.split(/\r?\n{2,}/).map(x=>x.trim()).filter(Boolean))
+        .filter(x=>!isLabelled(x));
+      if(!seen.has('l:'+k)){ seen.add('l:'+k); pushList(k, items, prettyLabel(k)); }
+      // labelled extras inside the block (Core belief:, Kinks:, …)
+      const { fields, lists } = pasteKeyValues(body, kind, name);
+      Object.entries(fields).forEach(([fk,v])=>{ if(fk!=='@name' && !seen.has('f:'+fk)){ seen.add('f:'+fk); pushField(fk, v, prettyLabel(fk)); } });
+      Object.entries(lists).forEach(([lk,v])=>{ if(lk!==k && !seen.has('l:'+lk)){ seen.add('l:'+lk); pushList(lk, v, prettyLabel(lk)); } });
+      return;
+    }
+
+    const { fields, lists, leftover } = pasteKeyValues(body, kind, name);
+    let main = leftover || body;
+    if(!seen.has('f:'+k) && main){ seen.add('f:'+k); pushField(k, main, prettyLabel(k)); }
+    Object.entries(fields).forEach(([fk,v])=>{ if(fk!=='@name' && !seen.has('f:'+fk)){ seen.add('f:'+fk); pushField(fk, v, prettyLabel(fk)); } });
+    Object.entries(lists).forEach(([lk,v])=>{ if(!seen.has('l:'+lk)){ seen.add('l:'+lk); pushList(lk, v, prettyLabel(lk)); } });
+  });
+
+  /* no headings at all: still take top-level "Label: value" lines */
+  if(!blocks.length){
+    const { fields, lists, leftover } = pasteKeyValues(text, kind, name);
+    Object.entries(fields).forEach(([k,v])=>{
+      if(k === '@name'){ if(!name) proposals.push({label:'Name', apply:{kind:'name', value:v}, preview:v}); return; }
+      pushField(k, v, prettyLabel(k));
+    });
+    Object.entries(lists).forEach(([k,v])=>pushList(k, v, prettyLabel(k)));
+    if(leftover){
+      const dest = (kind==='main'||kind==='side') ? 'backstory' : pasteDefaultField(kind);
+      proposals.push({label:prettyLabel(dest)+' (unlabelled text)', apply:{kind:'field', key:dest, value:leftover}, preview:leftover.slice(0,140)});
+    }
+  }
+  return proposals.filter(p=>{
+    const a = p.apply;
+    if(a.kind === 'name') return kind !== 'scenario';
+    if(a.kind === 'list') return (LIST_KEYS[kind]||[]).includes(a.key);
+    if(a.key === 'notes') return true;
+    return pasteHasField(kind, a.key);
+  });
+}
+
+/* where unlabelled prose goes on a non-character tab */
+function pasteDefaultField(kind){
+  const prefer = { scenario:'setting', location:'vibe', item:'appearance', faction:'goal',
+                   history:'event', concept:'definition' };
+  if(prefer[kind] && pasteHasField(kind, prefer[kind])) return prefer[kind];
+  const form = document.getElementById('form-'+kind);
+  const ta = form && form.querySelector('textarea[data-k]');
+  return ta ? ta.dataset.k : 'notes';
+}
+
+function prettyLabel(key){
+  const map = {tags:'Personality tags', triggers:'Psychology triggers', dialogue:'Example dialogue',
+    vibe:'Overall vibe', statusWhere:'Where they are now', statusFeel:'How they feel about it',
+    personalGoal:'Personal goal', contradiction:'Core contradiction', limitsNsfw:'Turn-offs & hard limits',
+    pawsHands:'Hands & feet', anthroOther:'Other non-human features', bodyHair:'Body & pubic hair',
+    coreBelief:'Core belief', protectiveStrategy:'Protective strategy', emotionalNeed:'Emotional need',
+    changeCondition:'Conditions for change', wrongBelief:'Wrongly believes', drawnTo:'Drawn to',
+    friction:'Friction points', clothes:'Usual clothes', partOf:'Part of', fullName:'Full name',
+    techLabel:'Era', storyGoal:"What it's driving toward", storyPressure:'If nobody acts', story:"What's going on",
+    keptAt:'Kept at', carriedBy:'Carried by', reach:'Size & reach', officialAccount:'What people say happened',
+    event:'What really happened', effect:'Effect on the present', scope:'Who knows about it',
+    soloFrequency:'Masturbation frequency', soloWhere:'Masturbation, where', soloFantasy:'What they think about',
+    soloFeeling:'How they feel about it'};
+  return map[key] || key.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/^./,c=>c.toUpperCase());
+}
+
+/* ---- UI ---- */
+function buildPastePanel(){
+  for(const kind of ['main','side','scenario','location','item','faction','history','concept']){
+    if(document.getElementById('paste-'+kind)) continue;
+    const box = document.createElement('details');
+    box.className = 'sec paste-panel'; box.id = 'paste-'+kind; box.hidden = true; box.open = true;
+    box.innerHTML =
+      '<summary>Paste text · detect fields</summary><div class="body">' +
+      '<p class="hint">Paste an entry, a card, or anything with headings or "Label: value" lines. The detector knows every field on this tab, including the section tags this tool exports. Nothing is guessed from prose — a value is only taken when it sits under a heading, an XML tag, or a label. Review what was found before applying.</p>' +
+      '<div class="field"><label>Pasted text<textarea class="paste-text" style="min-height:190px" spellcheck="false" placeholder="Paste here, then press Detect fields."></textarea></label></div>' +
+      '<div class="import-actions"><button type="button" class="btn primary paste-detect">Detect fields</button>' +
+      '<button type="button" class="btn paste-all">Select all</button>' +
+      '<button type="button" class="btn paste-none">Select none</button>' +
+      '<label class="toggle"><input type="checkbox" class="paste-new"> Apply to a new entry</label>' +
+      '<button type="button" class="btn paste-close">Close</button></div>' +
+      '<p class="hint paste-status" role="status" aria-live="polite"></p>' +
+      '<div class="paste-results"></div>' +
+      '<div class="import-actions paste-apply-row" hidden><button type="button" class="btn primary paste-apply">Apply selected</button>' +
+      '<span class="hint paste-count"></span></div>' +
+      '</div>';
+    const form = document.getElementById('form-'+kind);
+    if(form) form.insertBefore(box, form.firstChild);
+  }
+}
+
+let PASTE_FOUND = [];
+function pasteRender(kind){
+  const box = document.getElementById('paste-'+kind);
+  const results = box.querySelector('.paste-results');
+  results.replaceChildren();
+  if(!PASTE_FOUND.length){
+    box.querySelector('.paste-apply-row').hidden = true;
+    return;
+  }
+  PASTE_FOUND.forEach((p,i)=>{
+    const row = document.createElement('label');
+    row.className = 'paste-row';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = true; cb.dataset.i = i;
+    const name = document.createElement('span');
+    name.className = 'paste-field'; name.textContent = p.label;
+    const val = document.createElement('span');
+    val.className = 'paste-value';
+    val.textContent = p.preview.length > 160 ? p.preview.slice(0,157)+'…' : p.preview;
+    row.append(cb, name, val);
+    results.appendChild(row);
+  });
+  box.querySelector('.paste-apply-row').hidden = false;
+  box.querySelector('.paste-count').textContent = PASTE_FOUND.length + (PASTE_FOUND.length===1?' field found':' fields found');
+}
+
+function pasteApply(kind){
+  const box = document.getElementById('paste-'+kind);
+  const chosen = [...box.querySelectorAll('.paste-results input:checked')].map(cb=>PASTE_FOUND[+cb.dataset.i]);
+  if(!chosen.length){ toast('Nothing selected'); return; }
+  if(box.querySelector('.paste-new').checked){
+    S[kind].list.push(blankState(kind));
+    S[kind].active = S[kind].list.length - 1;
+  }
+  const st = S[kind].list[S[kind].active];
+  let n = 0;
+  chosen.forEach(p=>{
+    const a = p.apply;
+    if(a.kind === 'name'){ st.name = a.value; n++; }
+    else if(a.kind === 'field'){ st.fields[a.key] = a.value; n++; }
+    else if(a.kind === 'append'){ st.fields[a.key] = (st.fields[a.key]||'') + ((st.fields[a.key]||'').trim()?'\n\n':'') + a.value; n++; }
+    else if(a.kind === 'list'){
+      const cur_ = (st.lists[a.key]||[]).filter(x=>x.trim());
+      st.lists[a.key] = cur_.concat(a.value); n++;
+    }
+    if(['coat','ears','tail','muzzle','pawsHands','stance','anthroOther'].includes(a.key)) st.fields.useAnthro = true;
+    if((a.key||'').startsWith('dlg_')) st.fields.usePrompts = true;
+  });
+  hydrate();
+  toast('Filled '+n+(n===1?' field':' fields'));
+  box.querySelector('.paste-status').textContent = 'Applied '+n+' of '+PASTE_FOUND.length+' detected fields. Nothing else was changed.';
+}
+
+function wirePasteImport(){
+  buildPastePanel();
+  const btn = document.getElementById('btnPasteCharacter');
+  if(btn && !btn.dataset.wired){
+    btn.dataset.wired = '1';
+    btn.addEventListener('click', ()=>{
+      const box = document.getElementById('paste-'+mode);
+      if(!box){ toast('Open a tab with fields first'); return; }
+      box.hidden = !box.hidden;
+      if(!box.hidden){ box.open = true; box.querySelector('.paste-text').focus(); }
+    });
+  }
+  for(const kind of ['main','side','scenario','location','item','faction','history','concept']){
+    const box = document.getElementById('paste-'+kind);
+    if(!box || box.dataset.wired) continue;
+    box.dataset.wired = '1';
+    box.querySelector('.paste-detect').addEventListener('click', ()=>{
+      const text = box.querySelector('.paste-text').value;
+      if(!text.trim()){ box.querySelector('.paste-status').textContent = 'Paste some text first.'; return; }
+      PASTE_FOUND = parsePastedCharacter(text, kind);
+      box.querySelector('.paste-status').textContent = PASTE_FOUND.length
+        ? 'Untick anything you do not want. Existing values in those fields are replaced; list items are added.'
+        : 'No headings, tags, or labelled lines found. Try adding headings like "Backstory:" and detect again.';
+      pasteRender(kind);
+    });
+    box.querySelector('.paste-all').addEventListener('click', ()=>
+      box.querySelectorAll('.paste-results input').forEach(cb=>cb.checked = true));
+    box.querySelector('.paste-none').addEventListener('click', ()=>
+      box.querySelectorAll('.paste-results input').forEach(cb=>cb.checked = false));
+    box.querySelector('.paste-apply').addEventListener('click', ()=>pasteApply(kind));
+    box.querySelector('.paste-close').addEventListener('click', ()=>{ box.hidden = true; });
+  }
+}
+
 function wireLocalCardImport(){
   buildImportedPanel();
   const input=document.getElementById('externalCardFile');
@@ -4838,6 +5863,7 @@ function clearEntrySearch(){
 wireEntrySearch();
 wireLoreSettings();
 wireLocalCardImport();
+wirePasteImport();
 initProjectSystem().finally(()=>{ nameInput.focus(); });
 })();
 </script>
@@ -6030,6 +7056,10 @@ html[data-theme="paper"] .cluster-dialog{background:rgba(31,122,110,.06)}
     book:
       '<path d="M12 5v16M12 5C8 2 4 3 2 4v15c3-1 6-1 10 2M12 5c4-3 8-2 10-1v15c-3-1-6-1-10 2"/>',
 
+    sync:
+      '<circle cx="12" cy="12" r="2"/>' +
+      '<path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8"/>',
+
     info:
       '<circle cx="12" cy="12" r="9"/>' +
       '<path d="M12 11v6M12 7h.01"/>',
@@ -6099,6 +7129,7 @@ html[data-theme="paper"] .cluster-dialog{background:rgba(31,122,110,.06)}
     history:  {label:"History",        icon:"clock",   color:"#c2a18b", heading:"Historical record"},
     concept:  {label:"Concept",        icon:"book",    color:"#aaaee0", heading:"Worldbuilding notes"},
     relationships:{label:"Relationships", icon:"link", color:"#dfa868", heading:"Relationship graph"},
+    live:     {label:"Live",           icon:"sync",    color:"#5fb8b0", heading:"Live sync"},
     guide:    {label:"Guide",          icon:"book",    color:"#a0acb5", heading:"Field manual"},
     credits:  {label:"Credits",        icon:"info",    color:"#a0acb5", heading:"Credits"}
   };
