@@ -7,6 +7,9 @@
 - Exported XML tags keep letters (including accented ones), digits, `_`, `-` and `.`, and drop other characters. `O'Neil` now exports as `<ONeil>`, not `<O'Neil>`. Names with only letters, digits and spaces export as before. Old exports still import and display fine.
 - Unticking Main characters, Relationships or Scenario on the Live tab now removes those entries from the synced lorebook. Changing the active scenario removes the old one. Before, stale copies stayed active.
 
+### Added
+- Live sync warns you before importing a lorebook that wasn't made by the Workbench. It names the entries, explains that they'll go into Concepts and be rewritten in SillyTavern wrapped in Concept XML tags with a "[Concept]" name, and suggests backing the lorebook up first. The Live tab says the same.
+
 ### Fixed: saving and projects
 - A damaged project or a bad backup can no longer lock you out of every project. The Workbench skips what it can't read, opens the next project that loads, and says what went wrong. Bad backups are rejected before a project is created.
 - Autosave no longer stops silently after a failed load.

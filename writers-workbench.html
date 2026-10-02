@@ -1560,6 +1560,7 @@ pre#out .h{color:var(--accent)}
         <label class="toggle"><input type="checkbox" id="liveMain"> Main characters</label>
         <label class="toggle"><input type="checkbox" id="liveRelationships" checked> Relationship graph (always on in chat)</label>
         <p class="hint">Unticking something removes the Workbench's copy from the lorebook on the next sync, and switching the active scenario swaps it out. Pausing Live removes nothing.</p>
+        <p class="hint"><strong>Lorebooks not made by the Workbench:</strong> if you import one to sync it, every entry that isn't in Workbench format goes into Concepts, and on the first sync it's rewritten in SillyTavern wrapped in Concept XML tags and renamed "[Concept] Name". Back the lorebook up first if you want to keep its original format. You'll be asked before anything happens.</p>
       </section>
 
       <section class="live-card">
@@ -2866,11 +2867,20 @@ function liveInit(){
       const missing = all.filter(e=>typeof e.wwId !== 'string' || !(mine.has(e.wwId) ||
         (e.wwId === 'ww-relationships' && e.wwProject === (currentProjectId || 'default')))).length;
       if(missing){
+        const r = lorebookToProjectState(Object.assign({ name:book }, read.data), { keepIds:true });
+        const nf = r.foreign.length;
+        const sample = r.foreign.slice(0, 3).map(n=>'"'+n+'"').join(', ') + (nf > 3 ? ' and '+(nf-3)+' more' : '');
+        const warnForeign = nf
+          ? '⚠ WARNING: '+nf+(nf===1 ? ' entry isn\'t' : ' entries aren\'t')+' in Writer\'s Workbench format ('+sample+').\n'
+            + 'If you import, '+(nf===1 ? 'it goes' : 'they all go')+' into the Concepts category, and on the first sync '+(nf===1 ? 'its text is' : 'their text is')
+            + ' rewritten in SillyTavern: wrapped in Concept XML tags (<Name>, <Name_identity>, <Name_what_it_is>…) and renamed "[Concept] Name". '
+            + 'The original wording is kept inside the tags, but the old formatting isn\'t. Back up the lorebook first if you want to keep it as it is.\n\n'
+          : '';
         const pull = confirm('"'+book+'" has '+missing+(missing===1 ? ' entry' : ' entries')+' the Workbench doesn\'t have.\n\n'
-          + 'Import the whole lorebook into a new project and keep it in sync? Entries the Workbench didn\'t make go to Concepts and are rewritten in Workbench format on the first sync.\n\n'
-          + 'Cancel keeps your current project and syncs it into this lorebook alongside what\'s there.');
+          + warnForeign
+          + 'Import the whole lorebook into a new project and keep it in sync?\n\n'
+          + 'Cancel keeps your current project and syncs it into this lorebook alongside what\'s there'+(nf ? ', leaving '+(nf===1 ? 'that entry' : 'those entries')+' untouched' : '')+'.');
         if(pull){
-          const r = lorebookToProjectState(Object.assign({ name:book }, read.data), { keepIds:true });
           await flushProjectSave();
           const rec = await createProject(book+' — Live', r.state);
           try{ await switchProject(rec.id, false); }
