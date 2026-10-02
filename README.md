@@ -1,8 +1,26 @@
 # Writer's Workbench
-A simple character card and lorebook builder for SillyTavern and other AI roleplay platforms. 
+A simple character card and lorebook builder for SillyTavern and other AI roleplay platforms.
 
 Credits: Inspired by The Character Foundry by u/Due_Opportunity8693, Reddit link: https://www.reddit.com/r/SillyTavernAI/s/X4QE1rYhMT.
-Vibe coded with Claude. 
+Vibe coded with Claude.
+
+See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
+
+# Two ways to use it
+
+**As a plain file (offline).** Download `writers-workbench.html` and open it in your browser. Everything works except live sync.
+
+**As a SillyTavern extension (live sync).** This repo is also a SillyTavern extension, the Writer's Workbench Bridge. With it, edits in the Workbench are written straight into a SillyTavern lorebook, so the next message uses the new text.
+
+1. SillyTavern → Extensions panel → **Install extension** → paste `https://github.com/deiomo/Writers-Workbench` → Install.
+   (Manual install: copy this folder into `SillyTavern/data/<your-user>/extensions/` so that `extensions/Writers-Workbench/manifest.json` exists, then reload SillyTavern.)
+2. Wand menu → **Writer's Workbench**. It opens in a new tab, served by SillyTavern.
+3. In the Workbench, open the **Live** tab, pick a lorebook (or make a new one), and tick Live.
+4. In SillyTavern: World Info → activate that lorebook once.
+
+Requires SillyTavern 1.12.12 or newer. Full bridge details, including exactly what it will and won't touch, are in [BRIDGE.md](BRIDGE.md).
+
+Note: the copy served by SillyTavern keeps its own saved projects, separate from a copy you open as a local file. Move work between them with project export/import.
 
 # Features!
 
@@ -16,7 +34,13 @@ It comes with token counter, but don't expect it to be accurate.
 
 A map maker that generates a dynamic description
 
-Character relationship graph 
+Character relationship graph
+
+Paste import: paste a character written anywhere (headings, `Key: value` lines, bullets, XML-style tags) and pick which detected fields to apply.
+
+Lorebook import: load a SillyTavern lorebook (or a Workbench export) back in as a project.
+
+Live sync into SillyTavern lorebooks (with the bridge extension above).
 
 # Current templates available:
 
@@ -35,35 +59,3 @@ Factions
 History: events, and how they affect the present
 
 Concepts: magic systems, laws, customs, species, anything else
-
-# Changelog (September 17th, 2026)
-
-- Multiple projects with separate autosaves and project backups.
-
-- Local character imports for JSON, PNG, text, and Markdown, without requiring the template.
-
-- Location map builder with walls, doors, objects, exits, and generated descriptions.
-
-- Nested location groups for floors, houses, neighborhoods, and towns.
-
-- Character relationship graph with labeled, reciprocal or one-way connections.
-
-- Per-entry lorebook settings covering activation, keywords, placement, timing, recursion, and inclusion groups.
-
-- Project-wide search with category filters and clickable results.
-
-# Quality-of-life improvements
-
-- Combined “Export everything” lorebook export.
-  
-- Move imported passages into template fields while preserving the original card.
-  
-- Two-click room and group connections without extra confirmation.
-  
-- Multi-selection, group movement, collapse/expand, and resizing-aware graph dragging.
-  
-- Keyboard shortcuts and matching dark-theme styling for search.
-  
-- Recovery of the previous autosaved workspace into a project.
-
-- Removed external font requests; import processing stays local without AI.

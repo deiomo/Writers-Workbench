@@ -9,16 +9,17 @@ SillyTavern 1.12.12 or newer. Older versions show a message saying so instead of
 
 ## Install
 
-1. Copy this whole `writers-workbench-bridge` folder into
-   `SillyTavern/data/<your-user>/extensions/`
-   (usually `data/default-user/extensions/`).
-2. Restart SillyTavern, or reload the page.
-3. Extensions panel → Writer's Workbench Bridge should appear. The wand menu gets a
-   "Writer's Workbench" item.
+Easiest: SillyTavern → Extensions panel → Install extension → paste
+`https://github.com/deiomo/Writers-Workbench` → Install. Updates come through SillyTavern's
+extension updater.
 
-   Check the folder layout: `extensions/writers-workbench-bridge/manifest.json`.
-   If you see `extensions/writers-workbench-bridge/writers-workbench-bridge/manifest.json`,
-   the zip was extracted one level too deep and SillyTavern won't find it.
+Manual: copy this whole folder into `SillyTavern/data/<your-user>/extensions/`
+(usually `data/default-user/extensions/`), then restart SillyTavern or reload the page.
+Check the layout: `extensions/<folder>/manifest.json`. If `manifest.json` is one folder deeper,
+the zip was extracted one level too deep and SillyTavern won't find it.
+
+Extensions panel → Writer's Workbench Bridge should appear, and the wand menu gets a
+"Writer's Workbench" item.
 
 ## Use
 
