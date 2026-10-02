@@ -2843,6 +2843,11 @@ function liveInit(){
   const commitTarget = async (book, switching)=>{
     liveSwitching = true;
     try{ return await commitTargetInner(book, switching); }
+    catch(err){
+      console.warn(err);
+      liveStatus('Could not use "'+book+'": '+(err && err.message || err)+(liveOn ? ' Still syncing into "'+liveTarget+'".' : ''));
+      return false;
+    }
     finally{ liveSwitching = false; }
   };
   const commitTargetInner = async (book, switching)=>{
@@ -2868,7 +2873,8 @@ function liveInit(){
           const r = lorebookToProjectState(Object.assign({ name:book }, read.data), { keepIds:true });
           await flushProjectSave();
           const rec = await createProject(book+' — Live', r.state);
-          await switchProject(rec.id, false);
+          try{ await switchProject(rec.id, false); }
+          catch(err){ await dbDeleteProject(rec.id).catch(()=>{}); await refreshProjectSelect().catch(()=>{}); throw err; }
           /* the relationship entry's id is per project now */
           const links = r.links.map(l=>l.wwId === 'ww-relationships' ? { uid:l.uid, wwId:liveRelId() } : l);
           const linked = await ask('link', { book:book, project:currentProjectId, links:links }, 8000);
@@ -4669,12 +4675,19 @@ async function refreshProjectSelect(){
   return rows;
 }
 
+/* the state last loaded or saved, so a save with no changes (switching away, closing
+   the page) is skipped and doesn't mark other tabs on this project stale */
+let projectSavedJson=null;
+function projectCompareJson(snap){ return JSON.stringify(Object.assign({}, snap, {savedAt:0})); }
 function writeCurrentProject(onExit){
   if(!projectDB || !currentProjectId || suppressProjectSave || projectStale) return projectSavePromise;
   // Capture both the project id and its state before any async database work.
   // This prevents a fast project switch from ever writing Project B into Project A.
   const id=currentProjectId;
-  const state=JSON.parse(JSON.stringify(snapshot()));
+  const json=JSON.stringify(snapshot());
+  const cmp=projectCompareJson(JSON.parse(json));
+  if(projectSavedJson && projectSavedJson.id===id && projectSavedJson.json===cmp) return projectSavePromise;
+  const state=JSON.parse(json);
   // The read-modify-write runs in ONE transaction opened right now (not after a
   // promise hop), so a save started from pagehide still reaches the database, and
   // saves land in the order they were made.
@@ -4703,6 +4716,7 @@ function writeCurrentProject(onExit){
   }catch(err){ done=Promise.reject(err); }
   projectSavePromise=projectSavePromise.then(()=>done).then(wrote=>{
     if(!wrote) return;
+    projectSavedJson={id:id, json:cmp};
     announceProjectSaved(id);
     if(id===currentProjectId){
       const t=new Date();
@@ -4751,6 +4765,7 @@ async function switchProject(id, saveFirst=true){
     suppressProjectSave=false;
   }
   currentProjectId=id;
+  try{ projectSavedJson={id:id, json:projectCompareJson(snapshot())}; }catch(_){ projectSavedJson=null; }
   cacheProjectRec(rec);
   clearProjectStale();
   if(localStorageOK){ try{ localStorage.setItem(ACTIVE_PROJECT_KEY,id); }catch(_){} }
@@ -4827,7 +4842,9 @@ async function duplicateProject(){
   };
   if(Object.keys(remap).some(id=>id.length<6)) fixShort(state);
   const copy=await createProject((rec.name||projectNameFallback())+" — Copy",state);
-  await switchProject(copy.id,false); toast("Project duplicated");
+  try{ await switchProject(copy.id,false); }
+  catch(err){ await dbDeleteProject(copy.id).catch(()=>{}); await refreshProjectSelect().catch(()=>{}); toastProjectError(err); return; }
+  toast("Project duplicated");
 }
 
 async function exportProjectBackup(){
@@ -4868,7 +4885,7 @@ function loreBaseExpect(kind, isConst){
     sticky:0, cooldown:0, delay:0, keysecondary:[], vectorized:false, addMemo:true };
 }
 /* entry fields the Workbench writes itself, or rebuilds on import */
-const LORE_OWN_KEYS = new Set(['uid','displayIndex','wwId','comment','content','key','keysecondary','constant','activation','keyMode']);
+const LORE_OWN_KEYS = new Set(['uid','displayIndex','wwId','wwProject','comment','content','key','keysecondary','constant','activation','keyMode']);
 
 function loreSettingsFromEntry(e, st, kind, opts){
   opts = opts || {};
@@ -5097,7 +5114,8 @@ async function importProjectBackupFile(file){
     state = r.state;
     await flushProjectSave();
     const rec0 = await createProject(name+" — From lorebook", state);
-    await switchProject(rec0.id,false);
+    try{ await switchProject(rec0.id,false); }
+    catch(err){ await dbDeleteProject(rec0.id).catch(()=>{}); await refreshProjectSelect().catch(()=>{}); throw err; }
     const parts = Object.entries(r.counts).map(([k,n])=>n+" "+({side:"side character",main:"main character",location:"location",item:"item",faction:"faction",history:"history entry",concept:"concept",scenario:"scenario"}[k]||k)+(n===1?"":"s"));
     if(r.relationships) parts.push(r.relationships+" relationship"+(r.relationships===1?"":"s"));
     toast("Imported "+parts.join(", "));

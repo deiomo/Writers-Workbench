@@ -127,10 +127,18 @@ function sanitizeEntry(raw, cut) {
             out[k] = (v === null || typeof v === 'boolean' || typeof v === 'number') ? v : def;
         }
     }
-    /* anything ST has that we don't list (e.g. newer fields) passes through if it's a plain value */
+    /* anything ST has that we don't list (e.g. newer fields, or characterFilter / triggers kept
+       from an imported entry) passes through if it's a plain value or small plain JSON */
     for (const [k, v] of Object.entries(raw)) {
-        if (k in out || k === 'uid' || k === 'displayIndex') continue;
+        if (k in out || k === 'uid' || k === 'displayIndex' || k === '__proto__') continue;
         if (v === null || ['string', 'number', 'boolean'].includes(typeof v)) out[k] = typeof v === 'string' ? clip(v, MAX_TEXT) : v;
+        else if (typeof v === 'object') {
+            let json;
+            try { json = JSON.stringify(v); } catch (_) { continue; }
+            if (typeof json !== 'string') continue;
+            if (json.length > MAX_TEXT) { if (cut) cut.n++; continue; }
+            out[k] = JSON.parse(json);
+        }
     }
     return out;
 }
