@@ -1906,7 +1906,9 @@ window.wwEstTokens = estTokens;   // shared with the visual layer so both counts
 /* ================= name helpers ================= */
 function nm(){ return cur().name.trim() || "[Name]"; }
 function poss(){ return nm() + "'s"; }
-function tagOf(st, kind){ return kind==="scenario" ? "scenario" : (st.name.trim().replace(/\s+/g,"") || "name"); }
+/* XML tag base: letters/digits (any script), "_", "-" and "." survive; spaces and
+   anything else (apostrophes, &, quotes, brackets) are dropped. "O'Neil" -> "ONeil". */
+function tagOf(st, kind){ return kind==="scenario" ? "scenario" : (st.name.trim().replace(/[^\p{L}\p{M}\p{N}_.\-]+/gu,"") || "name"); }
 function labelOf(st, kind){
   if(kind==="scenario") return (st.fields.location||"").trim() || "Scenario";
   return st.name.trim() || "Untitled";
@@ -2231,6 +2233,11 @@ function sectionTag(kind, key){
   const k = (SECTION_TAGS[kind] && SECTION_TAGS[kind][key]) || SECTION_TAGS._shared[key] || key;
   return k.replace(/[^A-Za-z0-9_]/g,"_").toLowerCase();
 }
+/* every suffix a section tag can end in, so "<Kou_Li_current_status>" splits as
+   Kou_Li + current_status. Shared with the Reading view in the other script. */
+const SECTION_SUFFIXES = [...new Set(Object.values(SECTION_TAGS).flatMap(m=>Object.values(m))
+  .map(v=>v.replace(/[^A-Za-z0-9_]/g,"_").toLowerCase()))].sort((a,b)=>b.length-a.length);
+window.wwSectionSuffixes = SECTION_SUFFIXES;
 /* Strip the markdown heading a segment starts with; the XML tag now names the section. */
 function stripHeading(md){
   return md.replace(/^#{1,3} [^\n]*(\n+|$)/, "").trim();
@@ -2255,15 +2262,16 @@ function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/
 function render(){
   if(mode==="location") ensureLocationGroups();
   const md = build();
-  let html = esc(md);
-  html = html.replace(/^(&lt;\/?[A-Za-z0-9_.\-]+&gt;)$/gm, '<span class="h">$1</span>');
-  const n = cur().name.trim();
-  if(n){
-    const safe = n.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-    html = html.replace(new RegExp(safe,"g"), '<span class="n">'+esc(n)+'</span>');
-  }else{
-    html = html.replace(/\[Name\]/g, '<span class="n">[Name]</span>');
-  }
+  /* Find tag lines and the name in the raw text, then escape each piece, so
+     markup is never re-matched (a name like "span" or "amp" stays harmless). */
+  const needle = cur().name.trim() || "[Name]";
+  const hlName = s=>{
+    let o = "", i = 0, j;
+    while((j = s.indexOf(needle, i)) > -1){ o += esc(s.slice(i,j))+'<span class="n">'+esc(needle)+'</span>'; i = j+needle.length; }
+    return o + esc(s.slice(i));
+  };
+  const html = md.split("\n").map(line=>/^<\/?[\p{L}\p{M}\p{N}_.\-]+>$/u.test(line)
+    ? '<span class="h">'+hlName(line)+'</span>' : hlName(line)).join("\n");
   out.innerHTML = html;
 
   // per-section tokens
@@ -4572,21 +4580,110 @@ function applyProposalsTo(st, kind, props){
   });
 }
 
-function loreSettingsFromEntry(e, st, kind){
+/* What the Workbench itself writes for an entry with no lorebook settings. An imported
+   entry that matches this needs no stored settings; anything else is kept. */
+function loreBaseExpect(kind, isConst){
+  return { constant:isConst, selective:!isConst, selectiveLogic:0, order:100, position:0, disable:false,
+    excludeRecursion:false, preventRecursion:false, delayUntilRecursion:false, probability:100,
+    useProbability:true, depth:4, group:'', groupOverride:false, groupWeight:100, scanDepth:null,
+    caseSensitive:null, matchWholeWords:null, useGroupScoring:null, automationId:'', role:null,
+    sticky:0, cooldown:0, delay:0, keysecondary:[], vectorized:false, addMemo:true };
+}
+/* entry fields the Workbench writes itself, or rebuilds on import */
+const LORE_OWN_KEYS = new Set(['uid','displayIndex','wwId','comment','content','key','keysecondary','constant','activation','keyMode']);
+
+function loreSettingsFromEntry(e, st, kind, opts){
+  opts = opts || {};
   const raw = {};
-  WI_FIELDS.forEach(([,fields])=>fields.forEach(([key])=>{ if(key in e) raw[key] = e[key]; }));
-  const alwaysOnByDefault = (kind === 'scenario');
+  const wiKeys = new Set();
+  WI_FIELDS.forEach(([,fields])=>fields.forEach(([key])=>{ wiKeys.add(key); if(key in e) raw[key] = e[key]; }));
+  const alwaysOnByDefault = (kind === 'scenario' || kind === 'relationships');
   raw.activation = e.constant ? (alwaysOnByDefault ? 'default' : 'constant')
                               : (alwaysOnByDefault ? 'keywords' : 'default');
+  const isConst = alwaysOnByDefault || (kind === 'main' && !!opts.mainConstant);
   const auto = wiAutomaticKeys(st, kind);
   const keys = Array.isArray(e.key) ? e.key.filter(k=>typeof k === 'string') : [];
   const same = keys.length === auto.length && keys.every(k=>auto.includes(k));
   raw.keyMode = same ? 'auto' : 'custom';
   raw.key = same ? [] : keys;
   const out = wiNormalize(raw);
-  // store nothing when every setting is the default
-  const defaults = wiNormalize({});
-  return JSON.stringify(out) === JSON.stringify(defaults) ? null : out;
+  const eq = (a,b)=>JSON.stringify(a) === JSON.stringify(b);
+  /* values the settings form cannot hold exactly (role:null, delayUntilRecursion:false,
+     vectorized, characterFilter, triggers, …) are kept as written */
+  const passthrough = {};
+  Object.keys(e).forEach(k=>{
+    if(LORE_OWN_KEYS.has(k) || e[k] === undefined) return;
+    if(wiKeys.has(k)){ if(WI_FIELDS.some(([,f])=>f.some(d=>d[0]===k && d[2]==='lines'))) return; if(!eq(e[k], out[k])) passthrough[k] = e[k]; }
+    else if(!(k === 'vectorized' && e[k] === false) && !(k === 'addMemo' && e[k] === true)) passthrough[k] = e[k];
+  });
+  /* a scenario's comment is normally its Location; keep a different one */
+  const commentAs = (kind === 'scenario' && opts.title && opts.title !== labelOf(st, kind))
+    ? { text:opts.title, label:labelOf(st, kind) } : null;
+  // store nothing when the entry is exactly what the Workbench would write anyway
+  const expect = loreBaseExpect(kind, isConst);
+  const baseKeys = isConst ? [] : auto;
+  const plain = !commentAs &&
+    !!e.constant === isConst && keys.length === baseKeys.length && keys.every(k=>baseKeys.includes(k)) &&
+    Object.keys(e).every(k=>{
+      if(LORE_OWN_KEYS.has(k)) return k !== 'keysecondary' || eq(e[k], []);
+      if(k in expect) return eq(e[k], expect[k]);
+      if(wiKeys.has(k)) return eq(e[k], wiNormalize({})[k]);
+      return false;
+    });
+  if(plain) return null;
+  if(Object.keys(passthrough).length) out.passthrough = passthrough;
+  // settings the source entry did not have stay out of the export while left at their default
+  const omit = [...wiKeys].filter(k=>!(k in e) && !(k in expect) && !['activation','keyMode','key'].includes(k));
+  if(omit.length) out.omit = omit;
+  if(commentAs) out.commentAs = commentAs;
+  return out;
+}
+
+/* a V2 card's character_book entry (keys, insertion_order, extensions{…}) as a
+   SillyTavern World Info entry */
+const LB_V2_EXT = { exclude_recursion:'excludeRecursion', prevent_recursion:'preventRecursion',
+  delay_until_recursion:'delayUntilRecursion', display_index:'displayIndex', probability:'probability',
+  useProbability:'useProbability', depth:'depth', selectiveLogic:'selectiveLogic', group:'group',
+  group_override:'groupOverride', group_weight:'groupWeight', scan_depth:'scanDepth',
+  case_sensitive:'caseSensitive', match_whole_words:'matchWholeWords', use_group_scoring:'useGroupScoring',
+  automation_id:'automationId', role:'role', vectorized:'vectorized', sticky:'sticky', cooldown:'cooldown',
+  delay:'delay', match_persona_description:'matchPersonaDescription',
+  match_character_description:'matchCharacterDescription', match_character_personality:'matchCharacterPersonality',
+  match_character_depth_prompt:'matchCharacterDepthPrompt', match_scenario:'matchScenario',
+  match_creator_notes:'matchCreatorNotes', triggers:'triggers', ignore_budget:'ignoreBudget',
+  outlet_name:'outletName', character_filter:'characterFilter' };
+function lbEntryFromV2(e){
+  if(Array.isArray(e.key) || !Array.isArray(e.keys)) return e;
+  const x = (e.extensions && typeof e.extensions === 'object') ? e.extensions : {};
+  const out = {
+    key: e.keys.filter(k=>typeof k === 'string'),
+    keysecondary: Array.isArray(e.secondary_keys) ? e.secondary_keys.filter(k=>typeof k === 'string') : [],
+    comment: String(e.comment || e.name || ''),
+    content: String(e.content || ''),
+    constant: !!e.constant,
+    selective: e.selective === undefined ? true : !!e.selective,
+    order: typeof e.insertion_order === 'number' ? e.insertion_order : 100,
+    position: typeof x.position === 'number' ? x.position : (e.position === 'after_char' ? 1 : 0),
+    disable: e.enabled === false
+  };
+  if(e.id !== undefined && e.id !== null && Number.isFinite(Number(e.id))) out.uid = Number(e.id);
+  Object.entries(LB_V2_EXT).forEach(([from,to])=>{ if(x[from] !== undefined) out[to] = x[from]; });
+  return out;
+}
+
+/* "A to B: label" against the known character names, longest first, so names that
+   contain " to " or ":" still split correctly */
+function lbSplitRelation(line, names){
+  const t = line.replace(/^\s*[-*]\s+/, '').trim();
+  for(const a of names){
+    if(!t.startsWith(a+' to ')) continue;
+    const rest = t.slice(a.length+4);
+    for(const b of names){
+      if(rest.startsWith(b+':')) return { from:a, to:b, label:rest.slice(b.length+1).trim() };
+    }
+  }
+  const r = t.match(/^(.+?) to (.+?):\s*(.+?)\s*$/);
+  return r ? { from:r[1].trim(), to:r[2].trim(), label:r[3].trim() } : null;
 }
 
 function lorebookToProjectState(book, opts){
@@ -4596,22 +4693,38 @@ function lorebookToProjectState(book, opts){
   const lists = {}; Object.keys(S).forEach(k=>{ lists[k] = []; });
   const relLines = [];
   const counts = {}, foreign = [];
-  const entries = Object.values(book.entries || {}).filter(e=>e && typeof e === 'object')
+  const rawEntries = Array.isArray(book.entries) ? book.entries : Object.values(book.entries || {});
+  const entries = rawEntries.filter(e=>e && typeof e === 'object').map(lbEntryFromV2)
     .sort((a,b)=>(a.displayIndex ?? a.uid ?? 0) - (b.displayIndex ?? b.uid ?? 0));
+  const labelOfEntry = e=>{
+    const m = String(e.comment || '').trim().match(/^\[([A-Za-z]+)\]\s*(.*)$/);
+    return m ? m[1].toLowerCase() : '';
+  };
+  const isCast = e=>labelOfEntry(e) === 'cast' || /^\s*<relationships>/.test(String(e.content || ''));
+  const hasCast = entries.some(isCast);
+  /* "Always active" main characters are a project setting in the Workbench */
+  const mainEntries = entries.filter(e=>!isCast(e) && labelOfEntry(e) === 'main');
+  const mainConstant = mainEntries.length > 0 && mainEntries.every(e=>e.constant && !(e.key||[]).length);
+  if(mainConstant) state.mainConstant = true;
+  const relSecRe = new RegExp('^[ \\t]*<('+PASTE_TAG+'_relationships)>[ \\t]*\\n?([\\s\\S]*?)\\n?[ \\t]*</\\1>[ \\t]*$','gmu');
+  const pendingSettings = [];
 
   entries.forEach(e=>{
     const comment = String(e.comment || '').trim();
-    const content = String(e.content || '');
+    let content = String(e.content || '');
     const m = comment.match(/^\[([A-Za-z]+)\]\s*(.*)$/);
     const label = m ? m[1].toLowerCase() : '';
-    const title = m ? m[2].trim() : comment;
+    const workbench = !!(m && (LB_KIND[label] || label === 'cast'));
+    const title = workbench ? m[2].trim() : comment;
 
-    if(label === 'cast' || /^\s*<relationships>/.test(content)){
+    if(isCast(e)){
       if(e.uid !== undefined) links.push({ uid:e.uid, wwId:'ww-relationships' });
       content.split(/\r?\n/).forEach(line=>{
-        const r = line.match(/^\s*(.+?) to (.+?):\s*(.+?)\s*$/);
-        if(r) relLines.push({ from:r[1].trim(), to:r[2].trim(), label:r[3].trim() });
+        if(/^\s*<\/?relationships>\s*$/.test(line) || !/ to .+:/.test(line)) return;
+        relLines.push(line);
       });
+      const rs = loreSettingsFromEntry(e, { name:'Relationships', fields:{} }, 'relationships');
+      if(rs) state.relationshipLoreSettings = rs;
       return;
     }
 
@@ -4619,20 +4732,54 @@ function lorebookToProjectState(book, opts){
     if(!kind && /^\s*<scenario>/.test(content)) kind = 'scenario';
     if(!kind){ kind = 'concept'; foreign.push(title || (e.key && e.key[0]) || 'Untitled'); }
 
+    /* a character's relationships section: lines from the graph are rebuilt from the
+       [Cast] entry, and a main character's own lines go back to its list */
+    const relBodies = [];
+    if(kind === 'main' || kind === 'side') content = content.replace(relSecRe, (all, tag, body)=>{ relBodies.push(body); return ''; });
+
     const st = blankState(kind);
     st.id = (opts.keepIds && typeof e.wwId === 'string' && e.wwId) ? e.wwId : wwId(kind);
     if(e.uid !== undefined) links.push({ uid:e.uid, wwId:st.id });
-    applyProposalsTo(st, kind, parsePastedCharacter(content, kind));
+    const found = parsePastedCharacter(content, kind);
+    let props = found;
+    if(!workbench){
+      // an entry from elsewhere is named by its comment, then its heading, then its keys
+      const parsed = props.find(p=>p.apply.kind === 'name');
+      props = props.filter(p=>p.apply.kind !== 'name');
+      if(kind !== 'scenario') st.name = title || (parsed && parsed.apply.value) || (Array.isArray(e.key) && e.key[0]) || 'Untitled';
+    }
+    applyProposalsTo(st, kind, props);
     if(kind !== 'scenario' && !String(st.name||'').trim()){
       st.name = title || (Array.isArray(e.key) && e.key[0]) || 'Untitled';
     }
+    relBodies.forEach(body=>{
+      const own = [], other = [];
+      body.split(/\r?\n/).forEach(line=>{
+        const b = line.match(/^\s*(?:[-*•])\s+(.*)$/);
+        const t = (b ? b[1] : line).trim();
+        if(!t) return;
+        const prefix = String(st.name||'').trim()+' to ';
+        if(kind === 'main' && t.startsWith(prefix)) own.push(t.slice(prefix.length));
+        else other.push(t);
+      });
+      if(own.length) st.lists.relationships = (st.lists.relationships||[]).filter(x=>String(x).trim()).concat(own);
+      if(other.length && !hasCast){
+        if(kind === 'main') st.lists.relationships = (st.lists.relationships||[]).filter(x=>String(x).trim()).concat(other);
+        else st.fields.notes = (st.fields.notes ? st.fields.notes+'\n\n' : '') + 'relationships\n' + other.map(x=>'- '+x).join('\n');
+      }
+    });
     const hasAny = Object.values(st.fields).some(v=>String(v||'').trim()) ||
                    Object.values(st.lists).some(l=>(l||[]).some(x=>String(x).trim()));
-    if(!hasAny && content.trim()) st.fields[pasteDefaultField(kind)] = content.trim();
-    const ls = loreSettingsFromEntry(e, st, kind);
-    if(ls) st.loreSettings = ls;
+    if(!hasAny && !found.length && content.trim()) st.fields[pasteDefaultField(kind)] = content.trim();
+    pendingSettings.push([e, st, kind, title]);
     lists[kind].push(st);
     counts[kind] = (counts[kind] || 0) + 1;
+  });
+
+  /* settings last: automatic keywords depend on the final name */
+  pendingSettings.forEach(([e, st, kind, title])=>{
+    const ls = loreSettingsFromEntry(e, st, kind, { mainConstant:mainConstant, title:title });
+    if(ls) st.loreSettings = ls;
   });
 
   Object.keys(S).forEach(k=>{ if(lists[k].length) state.rosters[k] = { list:lists[k], active:0 }; });
@@ -4640,12 +4787,14 @@ function lorebookToProjectState(book, opts){
   /* rebuild the relationship graph from "A to B: label" lines */
   const byName = {};
   ['main','side'].forEach(k=>lists[k].forEach(st=>{ const n = String(st.name||'').trim(); if(n) byName[n] = st.id; }));
+  const names = Object.keys(byName).sort((a,b)=>b.length - a.length);
+  const parsedRel = relLines.map(l=>lbSplitRelation(l, names)).filter(Boolean);
   const used = new Set(), rels = [];
-  relLines.forEach((r,i)=>{
+  parsedRel.forEach((r,i)=>{
     if(used.has(i)) return;
     const from = byName[r.from], to = byName[r.to];
     if(!from || !to) return;
-    const back = relLines.findIndex((q,j)=>j !== i && !used.has(j) && q.from === r.to && q.to === r.from && q.label === r.label);
+    const back = parsedRel.findIndex((q,j)=>j !== i && !used.has(j) && q.from === r.to && q.to === r.from && q.label === r.label);
     if(back > -1) used.add(back);
     used.add(i);
     rels.push({ id:wwId('rel'), from:from, to:to, label:r.label, reciprocal: back > -1 });
@@ -4663,7 +4812,7 @@ async function importProjectBackupFile(file){
   let name,state;
   if(d && d.format==="writers-workbench-project" && d.project && d.project.state){ name=d.project.name; state=d.project.state; }
   else if(d && d.rosters){ name=(file.name||"Imported Project").replace(/\.wwproject\.json$|\.json$/i,""); state=d; }
-  else if(d && d.entries && typeof d.entries==="object" && !Array.isArray(d.entries)){
+  else if(d && d.entries && typeof d.entries==="object"){   // World Info (entries object) or a character_book (entries array)
     const r = lorebookToProjectState(d);
     if(!r.total) throw new Error("That lorebook has no entries");
     name = (d.name || (file.name||"Imported lorebook").replace(/\.json$/i,""));
@@ -5177,7 +5326,7 @@ const PASTE_LABELS_CHAR = {
   'presence':'presence', 'quirks':'quirks', 'notes':'notes',
   'frequency':'soloFrequency', 'what they think about':'soloFantasy', 'how they feel about it':'soloFeeling',
   'backstory':'backstory', 'background':'backstory', 'abilities':'abilities',
-  'skills':'abilities', 'personality':'@tags', 'want':'want',
+  'skills':'abilities', 'personality':'@tags', 'want':'want', 'other':'nsfwOther', 'masturbation':'@skip',
   'core contradiction':'contradiction', 'contradiction':'contradiction'
 };
 const PASTE_LIST_LABELS_CHAR = {
@@ -5186,9 +5335,14 @@ const PASTE_LIST_LABELS_CHAR = {
   'turn offs and hard limits':'limitsNsfw', 'hard limits':'limitsNsfw',
   'example dialogue':'dialogue', 'personality tags':'tags', 'hobbies':'hobbies'
 };
+/* labels that mean a different field inside one section, keyed by the section's target */
+const PASTE_SECTION_LABELS = {
+  'field:statusWhere': { 'where they are now':'statusWhere', 'how they feel about it':'statusFeel' },
+  'field:intimacy': { 'where':'soloWhere', 'frequency':'soloFrequency', 'how they feel about it':'soloFeeling' }
+};
 
 const pasteNorm = s => s.toLowerCase().replace(/['’]s\b/g,'').replace(/[_\-]+/g,' ')
-  .replace(/[^a-z0-9 &]/g,' ').replace(/\s*&\s*/g,' and ').replace(/\s+/g,' ').trim();
+  .replace(/[^\p{L}\p{M}\p{N} &]/gu,' ').replace(/\s*&\s*/g,' and ').replace(/\s+/g,' ').trim();
 
 
 /* ---- per-tab maps, read from the tab itself ----
@@ -5255,6 +5409,10 @@ function pasteMapsFor(kind){
     "what's going on":'story', 'whats going on':'story', "what it's driving toward":'storyGoal',
     'what its driving toward':'storyGoal', 'if nobody acts':'storyPressure' };
   Object.entries(extraLabels).forEach(([k,v])=>reg(labels, k, v));
+  /* "Name:" is the entry name on every tab; a location's "Part of" names its group,
+     and "Contains" is rebuilt from the children, so it is skipped */
+  if(kind !== 'scenario') labels.name = '@name';
+  if(kind === 'location'){ reg(labels, 'part of', 'partOf'); reg(labels, 'contains', '@skip'); }
 
   /* characters keep their hand-tuned maps on top */
   if(kind === 'main' || kind === 'side'){
@@ -5265,7 +5423,7 @@ function pasteMapsFor(kind){
       const k = target.split(':').pop();
       return exists(k);
     };
-    const keep = src=>Object.fromEntries(Object.entries(src).filter(([,v])=>fits(v)));
+    const keep = src=>Object.fromEntries(Object.entries(src).filter(([,v])=>fits(v)).map(([k,v])=>[pasteNorm(k),v]));
     return {
       sections:   Object.assign({}, sections, keep(PASTE_SECTIONS_CHAR)),
       labels:     Object.assign({}, labels,   keep(PASTE_LABELS_CHAR)),
@@ -5288,70 +5446,152 @@ function pasteSectionKey(title, name){
   return t;
 }
 
-/* split pasted text into {title, body} blocks using XML tags or markdown headings */
+/* XML tag names: any letters or digits (José, Kou_Li), plus "_", ".", "-" and the
+   apostrophes older exports kept (<O'Brien_identity>). */
+const PASTE_TAG = "[\\p{L}\\p{M}\\p{N}_.\\-'’]+";
+const pasteReEsc = s => s.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&');
+
+/* pull XML-tagged sections out of the text. An outer tag that holds other tagged
+   sections (the <Name> wrapper) is a wrapper, not a section: it is unwrapped and
+   remembered. Returns the sections and whatever text sits outside them. */
+function pasteXml(text){
+  let t = String(text||'').replace(/\r\n?/g,'\n');
+  let wrapper = '';
+  const openRe = new RegExp('^[ \\t]*<('+PASTE_TAG+')>[ \\t]*$','gmu');
+  // inside a wrapper: a tagged block on lines of its own, or any <Wrapper_section>
+  const pairRe = new RegExp('^[ \\t]*<('+PASTE_TAG+')>[ \\t]*\\n[\\s\\S]*?\\n[ \\t]*</\\1>[ \\t]*$','mu');
+  for(let guard = 0; guard < 20; guard++){
+    let m, done = true;
+    openRe.lastIndex = 0;
+    while((m = openRe.exec(t)) !== null){
+      const after = t.slice(m.index + m[0].length);
+      const c = after.match(new RegExp('^[ \\t]*</'+pasteReEsc(m[1])+'>[ \\t]*$','mu'));
+      const inner = c ? after.slice(0, c.index) : '';
+      if(!c || !(pairRe.test(inner) || inner.includes('<'+m[1]+'_'))) continue;
+      if(!wrapper) wrapper = m[1];
+      t = t.slice(0, m.index) + after.slice(0, c.index) + after.slice(c.index + c[0].length);
+      done = false;
+      break;
+    }
+    if(done) break;
+  }
+  const sections = [];
+  const secRe = new RegExp('^[ \\t]*<('+PASTE_TAG+')>[ \\t]*\\n?([\\s\\S]*?)\\n?[ \\t]*</\\1>[ \\t]*$','gmu');
+  const rest = t.replace(secRe, (all, tag, body)=>{ sections.push({ tag:tag, body:body }); return ''; });
+  return { wrapper, sections, rest };
+}
+
+/* the section part of a tag: "<Kou_Li_current_status>" -> "current_status". Uses the
+   wrapper name when known, else the longest known section suffix, so names that hold
+   "_" themselves split in the right place. */
+function pasteTagTitle(tag, wrapper){
+  if(wrapper && tag.startsWith(wrapper+'_')) return tag.slice(wrapper.length+1);
+  const low = tag.toLowerCase();
+  const suf = SECTION_SUFFIXES.find(k=>low.endsWith('_'+k));
+  if(suf) return tag.slice(tag.length - suf.length);
+  const parts = tag.split('_');
+  for(let i = 1; i < parts.length; i++){
+    const t = parts.slice(i).join('_');
+    if(PM.sections[pasteNorm(t)]) return t;
+  }
+  const under = tag.indexOf('_');
+  if(PM.sections[pasteNorm(tag)] || under < 0) return tag;
+  return tag.slice(under+1);
+}
+
+/* split pasted text into {title, body} blocks using XML tags and markdown headings.
+   Text outside the tags is read for headings too, and anything before the first
+   heading comes back as an untitled block so its "Label: value" lines still count. */
 function pasteBlocks(text, name){
   const blocks = [];
-  const all = [...text.matchAll(/<([A-Za-z0-9_.\-]+)>\s*\n([\s\S]*?)\n<\/\1>/g)];
-  // Section tags contain "_" (e.g. <Kou_backstory>). If any exist, use only those:
-  // the outer <Kou> wrapper would otherwise swallow the whole card as one block.
-  const sections = [...text.matchAll(/<([A-Za-z0-9.\-]+_[A-Za-z0-9_]+)>\s*\n([\s\S]*?)\n<\/\1>/g)];
-  const use = sections.length ? sections : all;
-  if(use.length){
-    use.forEach(m=>{
-      const tag = m[1], under = tag.indexOf('_');
-      blocks.push({ title: under > -1 ? tag.slice(under+1) : tag, body: m[2] });
-    });
-    return blocks;
-  }
+  const xml = pasteXml(text);
+  xml.sections.forEach(s=>blocks.push({ title: pasteTagTitle(s.tag, xml.wrapper), body: s.body }));
+  const rest = xml.rest;
+  if(!rest.trim()) return blocks;
   /* A line is a heading when it is marked up (#, **bold**, "Label:") or when the
      bare line names a section we know. No guessing from ordinary prose. */
   const heads = [];
   const re = /^(?:#{1,6}[ \t]+(.+?)|\*\*(.+?)\*\*:?|([A-Z][A-Za-z '’&\/-]{2,40}):|([A-Z][A-Za-z '’&\/-]{2,45}))[ \t]*$/gm;
   let m;
-  while((m = re.exec(text)) !== null){
+  while((m = re.exec(rest)) !== null){
     const title = (m[1]||m[2]||m[3]||m[4]||'').trim();
-    if(m[4] && !PM.sections[pasteSectionKey(title, name)]) continue;  // bare line: known sections only
+    const key = pasteSectionKey(title, name);
+    if(m[4] && !PM.sections[key]) continue;  // bare line: known sections only
+    // "Core belief:" / "**Age:**" naming a field, not a section: a label whose value follows
+    if((m[2] || m[3]) && !PM.sections[key] && (PM.labels[key] || PM.listLabels[key])) continue;
     heads.push({ title: title, index: m.index, len: m[0].length });
   }
+  const pre = heads.length ? rest.slice(0, heads[0].index) : rest;
+  if(pre.trim()) blocks.push({ title: '', body: pre });
   heads.forEach((h,i)=>{
     const start = h.index + h.len;
-    const end = i+1 < heads.length ? heads[i+1].index : text.length;
-    blocks.push({ title: h.title, body: text.slice(start, end) });
+    const end = i+1 < heads.length ? heads[i+1].index : rest.length;
+    blocks.push({ title: h.title, body: rest.slice(start, end) });
   });
   return blocks;
 }
 
+/* bullet items; an unbulleted line straight after an item (no blank line between)
+   continues that item, as multi-line list entries are exported that way */
 function pasteBullets(body){
   const out = [];
+  let open = false;
   body.split(/\r?\n/).forEach(line=>{
     const m = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
-    if(m && m[1].trim()) out.push(m[1].trim());
+    if(m){ if(m[1].trim()){ out.push(m[1].trim()); open = true; } else open = false; return; }
+    if(!line.trim()){ open = false; return; }
+    if(open) out[out.length-1] += '\n' + line.trim();
   });
   return out;
 }
 
+/* "**Age:** 25" and "**Age**: 25" -> "Age: 25" */
+function pasteUnbold(line){
+  return line.replace(/^(\s*)\*\*([^*\n]+?)\*\*[ \t]*(:?)/, (all, sp, lab, col)=>
+    /:\s*$/.test(lab) ? sp+lab.trim() : (col ? sp+lab.trim()+':' : all));
+}
+
 /* pull "Label: value" pairs, returning the leftover prose too */
-function pasteKeyValues(body, kind, name){
+function pasteKeyValues(body, kind, name, runOn){
   const fields = {}, lists = {}, leftover = [];
-  let pendingList = null, pendingField = null;
+  let pendingList = null, pendingField = null, inItem = false, gap = false;
+  const form = document.getElementById('form-'+kind);
+  const longText = key=>!!(form && form.querySelector('textarea[data-k="'+key+'"]'));
   body.split(/\r?\n/).forEach(line=>{
+    line = pasteUnbold(line);
     const bullet = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
-    const labelOnly = line.match(/^\s*([A-Za-z][A-Za-z '’&\/-]{1,40})\s*:\s*$/);
-    if(pendingField && line.trim() && !labelOnly && !/^\s*[A-Za-z][A-Za-z '’&\/-]{1,40}\s*:\s*\S/.test(line)){
-      fields[pendingField] = (fields[pendingField] ? fields[pendingField]+'\n' : '') + line.trim();
+    const labelOnly = line.match(/^\s*([\p{L}\p{N}][\p{L}\p{M}\p{N}_ '’&\/.-]{1,60})\s*:\s*$/u);
+    const labelled = /^\s*[\p{L}\p{N}][\p{L}\p{M}\p{N}_ '’&\/.-]{1,60}\s*:\s*\S/u.test(line);
+    if(pendingField && line.trim() && !labelOnly && !labelled){
+      fields[pendingField] = (fields[pendingField] ? fields[pendingField]+(gap ? '\n\n' : '\n') : '') + line.trim();
+      gap = false;
       return;
     }
-    if(!line.trim()){ pendingField = null; }
+    if(!line.trim()){
+      // a long-text field under a label on its own line runs on across blank lines, up to the next label
+      if(pendingField && fields[pendingField] && longText(pendingField)) gap = true; else pendingField = null;
+      inItem = false; leftover.push(''); return;
+    }
+    gap = false;
     if(bullet && pendingList){
       (lists[pendingList] = lists[pendingList] || []).push(bullet[1].trim());
+      inItem = true;
       return;
     }
-    const kv = line.match(/^\s*([A-Za-z][A-Za-z '’&\/-]{1,40})\s*:\s*(.*)$/);
+    // a multi-line list item carries on until a blank line or a new label
+    if(pendingList && inItem && !bullet && !labelOnly && !labelled){
+      const arr = lists[pendingList];
+      arr[arr.length-1] += '\n' + line.trim();
+      return;
+    }
+    inItem = false;
+    const kv = line.match(/^\s*([\p{L}\p{N}][\p{L}\p{M}\p{N}_ '’&\/.-]{1,60})\s*:\s*(.*)$/u);
     if(kv){
       const key = pasteSectionKey(kv[1], name), val = kv[2].trim();
+      if(PM.labels[key] === '@skip'){ pendingList = null; pendingField = null; return; }
       if(PM.listLabels[key]){
-        pendingList = PM.listLabels[key];
-        if(val) (lists[pendingList] = lists[pendingList] || []).push(val);
+        pendingList = PM.listLabels[key]; pendingField = null;
+        if(val){ (lists[pendingList] = lists[pendingList] || []).push(val); inItem = true; }
         return;
       }
       pendingList = null; pendingField = null;
@@ -5363,12 +5603,17 @@ function pasteKeyValues(body, kind, name){
         (lists.tags = lists.tags || []).push(...val.split(/[,;]/).map(x=>x.trim()).filter(Boolean));
         return;
       }
-      if(PM.labels[key] && val){ fields[PM.labels[key]] = val; return; }
+      if(PM.labels[key] && val){
+        fields[PM.labels[key]] = val;
+        // in a section of labelled long texts, unlabelled paragraphs carry on the last one
+        if(runOn && longText(PM.labels[key])) pendingField = PM.labels[key];
+        return;
+      }
     }
     if(bullet) { pendingList = null; leftover.push(line); return; }
     if(line.trim()) { pendingList = null; leftover.push(line); }
   });
-  return { fields, lists, leftover: leftover.join('\n').trim() };
+  return { fields, lists, leftover: leftover.join('\n').replace(/\n{3,}/g,'\n\n').trim() };
 }
 
 /* main parser: text -> proposed changes */
@@ -5377,15 +5622,27 @@ function parsePastedCharacter(text, kind){
   const proposals = [];   // {label, apply:{kind:'field'|'list'|'name', key, value}, preview}
   let name = '';
 
-  const nameLine = text.match(/^\s*(?:##?\s*)?(?:Name|name)\s*:\s*(.+)$/m);
+  const nameLine = text.match(/^[ \t]*(?:##?[ \t]*)?(?:\*\*)?(?:Name|name)(?:\*\*)?[ \t]*:[ \t]*(?:\*\*[ \t]*)?(.+)$/m);
   if(nameLine) name = nameLine[1].trim();
   if(!name){
-    const wrapper = text.match(/<([A-Za-z0-9.\-]+)>\s*\n/);
-    if(wrapper && !wrapper[1].includes('_')) name = wrapper[1].replace(/([a-z])([A-Z])/g,'$1 $2');
+    // the outer <Name> wrapper, or a lone tag that is not a known section
+    const xml = pasteXml(text);
+    let tag = xml.wrapper;
+    if(!tag && xml.sections.length && !xml.sections[0].tag.includes('_') &&
+       !PM.sections[pasteNorm(xml.sections[0].tag)]) tag = xml.sections[0].tag;
+    if(tag && !/^(name|scenario|relationships)$/i.test(tag)) name = tag.replace(/(\p{Ll})(\p{Lu})/gu,'$1 $2');
   }
   if(!name){
+    // the first heading, unless it names a section ("## Backstory", "## Kou's Backstory")
     const h1 = text.match(/^##?\s+([^\n#].*)$/m);
-    if(h1) name = h1[1].trim();
+    if(h1){
+      const t = h1[1].replace(/\*\*/g,'').trim(), key = pasteSectionKey(t, '');
+      const poss = t.match(/^(.+?)['’]s\s+(.+)$/);
+      const words = key.split(' ');
+      if(PM.sections[key] || PM.labels[key] || PM.listLabels[key]) { /* a section, not a name */ }
+      else if(poss && PM.sections[pasteSectionKey(poss[2], '')]) name = poss[1].trim();
+      else if(!words.some((w,i)=>i>0 && PM.sections[words.slice(i).join(' ')])) name = t;
+    }
   }
   if(name && kind === 'scenario') name = '';
   if(name) proposals.push({label:'Name', apply:{kind:'name', value:name}, preview:name});
@@ -5394,6 +5651,7 @@ function parsePastedCharacter(text, kind){
 
   const pushField = (key, value, label)=>{
     if(!key || !value || !String(value).trim()) return;
+    if(key === 'partOf') value = String(value).split(' → ')[0];   // nearest group of "Room → Inn → Town"
     proposals.push({label:label, apply:{kind:'field', key:key, value:String(value).trim()}, preview:String(value).trim()});
   };
   const pushList = (key, arr, label)=>{
@@ -5403,7 +5661,7 @@ function parsePastedCharacter(text, kind){
   };
 
   const seen = new Set();
-  blocks.forEach(b=>{
+  const handleBlock = b=>{
     const key = pasteSectionKey(b.title, name);
     const target = PM.sections[key];
     const body = (b.body||'').trim();
@@ -5442,7 +5700,7 @@ function parsePastedCharacter(text, kind){
     const [type, k] = target.split(':');
     if(type === 'list'){
       const isLabelled = line=>{
-        const m = line.match(/^\s*([A-Za-z][A-Za-z '’&\/-]{1,40})\s*:\s*/);
+        const m = line.match(/^\s*([\p{L}\p{N}][\p{L}\p{M}\p{N}_ '’&\/.-]{1,60})\s*:\s*/u);
         if(!m) return false;
         const lk = pasteSectionKey(m[1], name);
         return !!(PM.labels[lk] || PM.listLabels[lk]);
@@ -5452,6 +5710,24 @@ function parsePastedCharacter(text, kind){
         : body.split(/\r?\n{2,}/).map(x=>x.trim()).filter(Boolean))
         .filter(x=>!isLabelled(x));
       if(!seen.has('l:'+k)){ seen.add('l:'+k); pushList(k, items, prettyLabel(k)); }
+      // prose next to the bullets (not part of an item or a label) is kept in Notes
+      if(bullets.length){
+        const prose = [];
+        let inItem = false, inLabel = false;
+        body.split(/\r?\n/).forEach(line=>{
+          const ln = pasteUnbold(line);
+          if(!ln.trim()){ inItem = false; inLabel = false; return; }
+          if(/^\s*(?:[-*•]|\d+[.)])\s+/.test(ln)){ inItem = !inLabel; return; }
+          if(isLabelled(ln)){ inItem = false; inLabel = /:\s*$/.test(ln); return; }
+          if(inItem || inLabel) return;
+          prose.push(ln.trim());
+        });
+        if(prose.length){
+          const t = prose.join('\n');
+          proposals.push({label:'Notes (from "'+b.title.trim()+'")', apply:{kind:'append', key:'notes',
+            value:b.title.trim()+'\n'+t}, preview:t.slice(0,140)});
+        }
+      }
       // labelled extras inside the block (Core belief:, Kinks:, …)
       const { fields, lists } = pasteKeyValues(body, kind, name);
       Object.entries(fields).forEach(([fk,v])=>{ if(fk!=='@name' && !seen.has('f:'+fk)){ seen.add('f:'+fk); pushField(fk, v, prettyLabel(fk)); } });
@@ -5459,11 +5735,25 @@ function parsePastedCharacter(text, kind){
       return;
     }
 
-    const { fields, lists, leftover } = pasteKeyValues(body, kind, name);
-    let main = leftover || body;
+    const { fields, lists, leftover } = pasteKeyValues(body, kind, name, true);
+    // the whole body only when nothing in it was labelled; a labelled value for this
+    // section's own field wins, and unlabelled text beside it is kept in Notes
+    const extracted = Object.keys(fields).length || Object.keys(lists).length;
+    let main = fields[k] !== undefined ? fields[k] : (leftover || (extracted ? '' : body));
+    if(fields[k] !== undefined && leftover){
+      proposals.push({label:'Notes (from "'+b.title.trim()+'")', apply:{kind:'append', key:'notes',
+        value:b.title.trim()+'\n'+leftover}, preview:leftover.slice(0,140)});
+    }
     if(!seen.has('f:'+k) && main){ seen.add('f:'+k); pushField(k, main, prettyLabel(k)); }
     Object.entries(fields).forEach(([fk,v])=>{ if(fk!=='@name' && !seen.has('f:'+fk)){ seen.add('f:'+fk); pushField(fk, v, prettyLabel(fk)); } });
     Object.entries(lists).forEach(([lk,v])=>{ if(!seen.has('l:'+lk)){ seen.add('l:'+lk); pushList(lk, v, prettyLabel(lk)); } });
+  };
+  blocks.forEach(b=>{
+    // a few labels mean different fields in different sections ("How they feel about it")
+    const over = PASTE_SECTION_LABELS[PM.sections[pasteSectionKey(b.title, name)]];
+    const saved = PM.labels;
+    if(over) PM.labels = Object.assign({}, PM.labels, over);
+    try{ handleBlock(b); } finally { PM.labels = saved; }
   });
 
   /* no headings at all: still take top-level "Label: value" lines */
@@ -5483,7 +5773,7 @@ function parsePastedCharacter(text, kind){
     const a = p.apply;
     if(a.kind === 'name') return kind !== 'scenario';
     if(a.kind === 'list') return (LIST_KEYS[kind]||[]).includes(a.key);
-    if(a.key === 'notes') return true;
+    if(a.key === 'notes' || (kind === 'location' && a.key === 'partOf')) return true;
     return pasteHasField(kind, a.key);
   });
 }
@@ -5539,20 +5829,25 @@ function buildPastePanel(){
   }
 }
 
-let PASTE_FOUND = [];
+const PASTE_FOUND = {};   // per tab: proposals detected on one tab never apply on another
 function pasteRender(kind){
   const box = document.getElementById('paste-'+kind);
   const results = box.querySelector('.paste-results');
+  const found = PASTE_FOUND[kind] || [];
+  // a detected name only replaces an existing one when asked to
+  const st = S[kind].list[S[kind].active];
+  const keepName = !box.querySelector('.paste-new').checked && !!String(st && st.name || '').trim();
   results.replaceChildren();
-  if(!PASTE_FOUND.length){
+  if(!found.length){
     box.querySelector('.paste-apply-row').hidden = true;
     return;
   }
-  PASTE_FOUND.forEach((p,i)=>{
+  found.forEach((p,i)=>{
     const row = document.createElement('label');
     row.className = 'paste-row';
     const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.checked = true; cb.dataset.i = i;
+    cb.type = 'checkbox'; cb.checked = !(keepName && p.apply.kind === 'name'); cb.dataset.i = i;
+    if(p.apply.kind === 'name') cb.dataset.name = '1';
     const name = document.createElement('span');
     name.className = 'paste-field'; name.textContent = p.label;
     const val = document.createElement('span');
@@ -5562,12 +5857,13 @@ function pasteRender(kind){
     results.appendChild(row);
   });
   box.querySelector('.paste-apply-row').hidden = false;
-  box.querySelector('.paste-count').textContent = PASTE_FOUND.length + (PASTE_FOUND.length===1?' field found':' fields found');
+  box.querySelector('.paste-count').textContent = found.length + (found.length===1?' field found':' fields found');
 }
 
 function pasteApply(kind){
   const box = document.getElementById('paste-'+kind);
-  const chosen = [...box.querySelectorAll('.paste-results input:checked')].map(cb=>PASTE_FOUND[+cb.dataset.i]);
+  const found = PASTE_FOUND[kind] || [];
+  const chosen = [...box.querySelectorAll('.paste-results input:checked')].map(cb=>found[+cb.dataset.i]).filter(Boolean);
   if(!chosen.length){ toast('Nothing selected'); return; }
   if(box.querySelector('.paste-new').checked){
     S[kind].list.push(blankState(kind));
@@ -5589,7 +5885,7 @@ function pasteApply(kind){
   });
   hydrate();
   toast('Filled '+n+(n===1?' field':' fields'));
-  box.querySelector('.paste-status').textContent = 'Applied '+n+' of '+PASTE_FOUND.length+' detected fields. Nothing else was changed.';
+  box.querySelector('.paste-status').textContent = 'Applied '+n+' of '+found.length+' detected fields. Nothing else was changed.';
 }
 
 function wirePasteImport(){
@@ -5611,8 +5907,8 @@ function wirePasteImport(){
     box.querySelector('.paste-detect').addEventListener('click', ()=>{
       const text = box.querySelector('.paste-text').value;
       if(!text.trim()){ box.querySelector('.paste-status').textContent = 'Paste some text first.'; return; }
-      PASTE_FOUND = parsePastedCharacter(text, kind);
-      box.querySelector('.paste-status').textContent = PASTE_FOUND.length
+      PASTE_FOUND[kind] = parsePastedCharacter(text, kind);
+      box.querySelector('.paste-status').textContent = PASTE_FOUND[kind].length
         ? 'Untick anything you do not want. Existing values in those fields are replaced; list items are added.'
         : 'No headings, tags, or labelled lines found. Try adding headings like "Backstory:" and detect again.';
       pasteRender(kind);
@@ -5622,6 +5918,11 @@ function wirePasteImport(){
     box.querySelector('.paste-none').addEventListener('click', ()=>
       box.querySelectorAll('.paste-results input').forEach(cb=>cb.checked = false));
     box.querySelector('.paste-apply').addEventListener('click', ()=>pasteApply(kind));
+    box.querySelector('.paste-new').addEventListener('change', e=>{
+      const st = S[kind].list[S[kind].active];
+      const nameCb = box.querySelector('.paste-results input[data-name]');
+      if(nameCb) nameCb.checked = e.target.checked || !String(st && st.name || '').trim();
+    });
     box.querySelector('.paste-close').addEventListener('click', ()=>{ box.hidden = true; });
   }
 }
@@ -5704,6 +6005,10 @@ function wiNormalize(raw){
       out[key]=Number.isFinite(n)?Math.max(options,Math.min(max,Math.trunc(n))):fallback;
     } else out[key]=typeof value==='string'?value:fallback;
   }));
+  // kept from an imported entry so a re-export writes back what was read (see loreSettingsFromEntry)
+  if(src.passthrough && typeof src.passthrough==='object' && !Array.isArray(src.passthrough)) out.passthrough=JSON.parse(JSON.stringify(src.passthrough));
+  if(src.commentAs && typeof src.commentAs==='object' && typeof src.commentAs.text==='string') out.commentAs={text:src.commentAs.text,label:String(src.commentAs.label||'')};
+  if(Array.isArray(src.omit)) out.omit=src.omit.filter(k=>typeof k==='string');
   return out;
 }
 function wiAutomaticKeys(st,kind){
@@ -5719,11 +6024,18 @@ function wiAutomaticKeys(st,kind){
 function applyLoreSettings(base,st,kind){
   if(!st.loreSettings) return base;
   const settings=wiNormalize(st.loreSettings);
-  const {activation,keyMode,key,...options}=settings;
+  const {activation,keyMode,key,passthrough,commentAs,omit,...options}=settings;
   const out={...base,...options};
   out.constant=activation==='default'?base.constant:activation==='constant';
   out.key=keyMode==='custom'?key:wiAutomaticKeys(st,kind);
   out.vectorized=false;
+  // imported values the form cannot show; a form value wins once it has been changed
+  if(passthrough) Object.entries(passthrough).forEach(([k,v])=>{
+    if(!(k in options)) out[k]=v;
+    else if(JSON.stringify(wiNormalize({[k]:v})[k])===JSON.stringify(options[k])) out[k]=v;
+  });
+  if(commentAs && kind==='scenario' && commentAs.label===labelOf(st,kind)) out.comment=commentAs.text;
+  if(omit){ const d=wiNormalize({}); omit.forEach(k=>{ if(k in options && !(k in base) && JSON.stringify(options[k])===JSON.stringify(d[k])) delete out[k]; }); }
   if(out.position===4 && out.role===null) out.role=0;
   return out;
 }
@@ -7347,11 +7659,13 @@ html[data-theme="paper"] .cluster-dialog{background:rgba(31,122,110,.06)}
 
     // Hide only the outer XML-like wrapper in Reading mode.
     // The original wrapper remains in Raw mode and every export.
+    let wrapperTag = "";
     if(
       lines.length >= 2 &&
       /^<[^<>]+>$/.test(lines[0].trim()) &&
       /^<\/[^<>]+>$/.test(lines[lines.length - 1].trim())
     ){
+      wrapperTag = lines[0].trim().slice(1, -1);
       lines.shift();
       lines.pop();
     }
@@ -7390,7 +7704,7 @@ html[data-theme="paper"] .cluster-dialog{background:rgba(31,122,110,.06)}
         return;
       }
 
-      const closeTag = line.match(/^<\/[A-Za-z0-9_.\-]+>$/);
+      const closeTag = line.match(/^<\/[\p{L}\p{M}\p{N}_.\-'’]+>$/u);
       if(closeTag){
         flushParagraph();
         list = null;
@@ -7398,7 +7712,20 @@ html[data-theme="paper"] .cluster-dialog{background:rgba(31,122,110,.06)}
         sectionDepth = Math.max(0, sectionDepth - 1);
         return;
       }
-      const openTag = line.match(/^<([A-Za-z0-9.\-]+)_([A-Za-z0-9_]+)>$/);
+      // <Name_section>: the name may hold "_" itself, so split off the wrapper
+      // name when it is known, else the longest known section suffix.
+      const openRaw = line.match(/^<([\p{L}\p{M}\p{N}_.\-'’]+)>$/u);
+      let openTag = null;
+      if(openRaw){
+        const tag = openRaw[1];
+        const known = window.wwSectionSuffixes || [];
+        if(wrapperTag && tag.startsWith(wrapperTag + "_")) openTag = [line, wrapperTag, tag.slice(wrapperTag.length + 1)];
+        else {
+          const suffix = known.filter(k=>tag.endsWith("_" + k)).sort((a,b)=>b.length - a.length)[0];
+          if(suffix) openTag = [line, tag.slice(0, -suffix.length - 1), suffix];
+          else if(tag.indexOf("_") > 0) openTag = [line, tag.slice(0, tag.indexOf("_")), tag.slice(tag.indexOf("_") + 1)];
+        }
+      }
       if(openTag){
         flushParagraph();
         list = null;
