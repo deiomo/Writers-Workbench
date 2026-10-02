@@ -6,7 +6,7 @@
     "js": "index.js",
     "css": "style.css",
     "author": "Deiomo",
-    "version": "0.3.0",
-    "homePage": "",
+    "version": "0.4.0",
+    "homePage": "https://github.com/deiomo/Writers-Workbench",
     "auto_update": false
 }
