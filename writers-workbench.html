@@ -2380,7 +2380,8 @@ function renderRoster(){
       R.list.splice(i,1);
       if(kind==="main" || kind==="side") removeRelationshipsFor(removedId);
       if(!R.list.length) R.list.push(blankState(kind));
-      R.active = Math.min(R.active, R.list.length-1);
+      if(i < R.active) R.active -= 1;
+      R.active = Math.max(0, Math.min(R.active, R.list.length-1));
       hydrate();
       toast("Removed from roster");
     });
@@ -2397,7 +2398,10 @@ function renderRoster(){
     hydrate();
     nameInput.focus();
   });
-  box.appendChild(add);
+  const actions = document.createElement("span");
+  actions.className = "roster-actions";
+  actions.appendChild(add);
+  box.appendChild(actions);
 
   const dup = document.createElement("button");
   dup.className = "roster-add"; dup.type = "button"; dup.textContent = "Duplicate";
@@ -2406,11 +2410,22 @@ function renderRoster(){
     const copy = JSON.parse(JSON.stringify(cur()));
     if(kind==="main" || kind==="side" || kind==="location") copy.id = wwId(kind);
     copy.name = (copy.name.trim() ? copy.name.trim()+" copy" : "");
+    let droppedExits = 0;
+    if(kind==="location" && copy.fields.mapData){
+      /* exits are two-way links to other rooms; a copy can't share the original's
+         without reciprocals, so it starts with none. Nudge it off the original too. */
+      const d = locData(copy);
+      droppedExits = d.exits.length;
+      d.exits = [];
+      if(d.ov && typeof d.ov==="object") d.ov = {x:(+d.ov.x||0)+60, y:(+d.ov.y||0)+60};
+      copy.fields.mapData = JSON.stringify(d);
+    }
     R.list.splice(R.active+1, 0, copy);
     R.active += 1;
     hydrate();
+    if(droppedExits) toast("Duplicated — exits weren't copied (they link to other locations)");
   });
-  box.appendChild(dup);
+  actions.appendChild(dup);
 
   const meta = document.createElement("span");
   meta.className = "roster-meta";
@@ -3134,19 +3149,39 @@ $("#btnSave").addEventListener("click", ()=>{
 
 $("#btnLoad").addEventListener("click", ()=> $("#fileIn").click());
 
+/* Tolerant: a damaged save must never throw here (that used to lock people out
+   of a project). Bad values are coerced to text or dropped, never trusted. */
 function coerce(d, kind){
   const fresh = blankState(kind);
+  if(!d || typeof d!=="object" || Array.isArray(d)) return fresh;
   /* every kind keeps its id: live sync and relationships identify entries by it */
   if(typeof d.id==="string" && d.id) fresh.id = d.id;
-  fresh.name = typeof d.name==="string" ? d.name : "";
-  fresh.fields = (d.fields && typeof d.fields==="object") ? d.fields : {};
+  fresh.name = typeof d.name==="string" ? d.name : (typeof d.name==="number" ? String(d.name) : "");
+  fresh.fields = {};
+  if(d.fields && typeof d.fields==="object" && !Array.isArray(d.fields)){
+    Object.keys(d.fields).forEach(k=>{
+      const v = d.fields[k];
+      if(typeof v==="string" || typeof v==="boolean") fresh.fields[k] = v;
+      else if(typeof v==="number" && isFinite(v)) fresh.fields[k] = String(v);
+    });
+  }
   LIST_KEYS[kind].forEach(k=>{
     const v = d.lists && d.lists[k];
-    if(Array.isArray(v) && v.length) fresh.lists[k] = v.slice();
+    if(!Array.isArray(v)) return;
+    const clean = v.filter(x=>typeof x==="string" || (typeof x==="number" && isFinite(x))).map(String);
+    if(clean.length) fresh.lists[k] = clean;
   });
-  if((kind==="main" || kind==="side") && d.imported && d.imported.version===1){
-    normalizeExternalCard(d.imported.original);
-    fresh.imported=cardClone(d.imported);
+  if((kind==="main" || kind==="side") && d.imported && typeof d.imported==="object" && d.imported.version===1){
+    try{
+      normalizeExternalCard(d.imported.original);
+      const imp = cardClone(d.imported);
+      const w = imp.working;
+      imp.working = (w && typeof w==="object" && !Array.isArray(w)) ? cardNormalizeNewlines(w) : normalizeExternalCard(imp.original);
+      CARD_TEXT_FIELDS.forEach(([k])=>{ if(imp.working[k]!=null && typeof imp.working[k]!=="string") delete imp.working[k]; });
+      if(imp.working.alternate_greetings!=null) imp.working.alternate_greetings = Array.isArray(imp.working.alternate_greetings) ? imp.working.alternate_greetings.filter(x=>typeof x==="string") : [];
+      if(typeof imp.filename!=="string") imp.filename = "character";
+      fresh.imported = imp;
+    }catch(err){ console.warn("Dropped unreadable imported-card data", err); }
   }
   if(d.loreSettings && typeof d.loreSettings==="object" && !Array.isArray(d.loreSettings)) fresh.loreSettings=JSON.parse(JSON.stringify(d.loreSettings));
   return fresh;
@@ -3168,7 +3203,9 @@ $("#fileIn").addEventListener("change", e=>{
         setMode("side");
         toast("Loaded roster of "+S.side.list.length);
       } else if(d.cardType==="side"){
-        S.side.list.push(coerce(d,"side"));
+        const entry = coerce(d,"side");
+        cardMd(entry,"side",true); /* throws before anything is added if the card can't render */
+        S.side.list.push(entry);
         S.side.active = S.side.list.length-1;
         setMode("side");
         toast("Added "+(d.name||"card")+" to the roster");
@@ -3226,7 +3263,9 @@ $("#fileIn").addEventListener("change", e=>{
         addImportedCharacter({version:1,filename:f.name,original:cardClone(d),working,originalFile:cardBytesToBase64(new TextEncoder().encode(r.result)),isPng:false});
         toast("Imported "+working.name+" locally");
       } else {
-        S.main.list.push(coerce(d,"main"));
+        const entry = coerce(d,"main");
+        cardMd(entry,"main",true); /* throws before anything is added if the card can't render */
+        S.main.list.push(entry);
         S.main.active = S.main.list.length-1;
         setMode("main");
         toast("Added "+(d.name||f.name)+" to the main roster");
@@ -3407,7 +3446,8 @@ function paintCell(x, y){
     d.cells   = d.cells.filter(c=>!(c.x===x && c.y===y));
     const gone = d.objects.filter(o=>o.x===x && o.y===y).map(o=>o.name);
     d.objects = d.objects.filter(o=>!(o.x===x && o.y===y));
-    if(gone.length) d.objects.forEach(o=>{ if(gone.includes(o.anchor)) o.anchor = null; });
+    /* anchors are by name: only clear them if no object of that name is left */
+    if(gone.length) d.objects.forEach(o=>{ if(gone.includes(o.anchor) && !d.objects.some(x=>x.name===o.anchor)) o.anchor = null; });
     if(d.cells.length + d.objects.length !== before) saveMap(d);
     return;
   }
@@ -3458,6 +3498,24 @@ function renderMapObjects(){
   hint.textContent = "Each object points at one other object. One object can be the anchor for many. Direction is worked out from the grid.";
   box.appendChild(hint);
 
+  /* rebuild every row's anchor list in place (no focus loss) after a rename */
+  const anchorRows = [];
+  const refreshAnchors = ()=>{
+    const dd = mapData();
+    anchorRows.forEach(({sel, rel, i})=>{
+      const o = dd.objects[i]; if(!o) return;
+      sel.replaceChildren(new Option("no anchor",""));
+      dd.objects.forEach(other=>{
+        if(other.name === o.name) return;
+        if([...sel.options].some(op=>op.value===other.name)) return;
+        const opt = new Option("relative to "+other.name, other.name);
+        if(o.anchor === other.name) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      const anchorObj = o.anchor ? dd.objects.find(x=>x.name===o.anchor) : null;
+      rel.textContent = anchorObj ? relWords(o, anchorObj) : "";
+    });
+  };
   d.objects.forEach((o,i)=>{
     const row = document.createElement("div");
     row.className = "map-obj";
@@ -3468,8 +3526,9 @@ function renderMapObjects(){
     name.addEventListener("input", ()=>{
       const dd = mapData(); const old = dd.objects[i].name;
       dd.objects[i].name = name.value;
-      dd.objects.forEach(x=>{ if(x.anchor===old) x.anchor = name.value; });
-      saveMap(dd, true); render();
+      /* follow the rename, unless another object still answers to the old name */
+      if(!dd.objects.some(x=>x.name===old)) dd.objects.forEach(x=>{ if(x.anchor===old) x.anchor = name.value; });
+      saveMap(dd, true); render(); refreshAnchors();
     });
     const sel = document.createElement("select");
     sel.appendChild(new Option("no anchor",""));
@@ -3494,9 +3553,10 @@ function renderMapObjects(){
       const dd = mapData();
       const gone = dd.objects[i].name;
       dd.objects.splice(i,1);
-      dd.objects.forEach(x=>{ if(x.anchor===gone) x.anchor = null; });
+      if(!dd.objects.some(x=>x.name===gone)) dd.objects.forEach(x=>{ if(x.anchor===gone) x.anchor = null; });
       saveMap(dd);
     });
+    anchorRows.push({sel, rel, i});
     row.append(sym, name, sel, rel, del);
     box.appendChild(row);
   });
@@ -3991,8 +4051,18 @@ function wireOverview(){
     dx=Math.max(dx,svg._extent.x+20-Math.min(...boxes.map(b=>b.x)));dy=Math.max(dy,svg._extent.y+20-Math.min(...boxes.map(b=>b.y)));
     moveClusterNodes(roots,dx,dy);drag={...drag,x:e.clientX,y:e.clientY,left:rect.left,top:rect.top,moved:true};e.preventDefault();renderOverview();
   });
+  /* double-click is detected from pointerups: the overview re-renders on
+     pointerdown and captures the pointer, so a native dblclick lands on the <svg> */
+  let lastUp=null, dblHandledAt=0;
   const end=e=>{
     if(!drag||e.pointerId!==drag.pointer)return;const old=drag;drag=null;if(svg.hasPointerCapture?.(old.pointer))svg.releasePointerCapture(old.pointer);
+    if(e.type==='pointerup' && !old.moved){
+      const now=Date.now();
+      if(lastUp && lastUp.id===old.id && now-lastUp.t<400){
+        lastUp=null;const st=locationById(old.id);
+        if(st&&st.fields.isGroup){dblHandledAt=now;toggle(st.id);return;}
+      }else lastUp={id:old.id,t:now};
+    }else if(e.type==='pointerup')lastUp=null;
     if(old.moved){
       // Keep explicit up/down/inside/outside exits; recompute compass routes.
       const scene=clusterScene();S.location.list.forEach(st=>{const d=locData(st);d.exits.forEach(ex=>{const b=scene.raw.get(ex.toId);if(b&&OV_STEP[ex.dir])ex.dir=dirBetween(scene.raw.get(st.id),b);});st.fields.mapData=JSON.stringify(d);});
@@ -4000,7 +4070,7 @@ function wireOverview(){
     }else if(e.type==='pointerup'){S.location.active=S.location.list.findIndex(s=>s.id===old.id);hydrate();}
   };
   ['pointerup','pointercancel','lostpointercapture'].forEach(type=>svg.addEventListener(type,end));
-  svg.addEventListener('dblclick',e=>{const hit=e.target.closest('[data-node]');if(hit){const st=locationById(hit.dataset.node);if(st.fields.isGroup)toggle(st.id);}});
+  svg.addEventListener('dblclick',e=>{if(Date.now()-dblHandledAt<600)return;const hit=e.target.closest('[data-node]');if(hit){const st=locationById(hit.dataset.node);if(st.fields.isGroup)toggle(st.id);}});
   svg.addEventListener('keydown',e=>{if(!['Enter',' '].includes(e.key))return;const toggleNode=e.target.closest('[data-toggle]'),hit=e.target.closest('[data-node]');if(toggleNode){e.preventDefault();toggle(toggleNode.dataset.toggle);}else if(hit){e.preventDefault();S.location.active=S.location.list.findIndex(s=>s.id===hit.dataset.node);hydrate();}});
   document.querySelectorAll('.ov-mode').forEach(btn=>btn.addEventListener('click',()=>{ovMode=btn.dataset.ov;clusterLinkStart=null;document.querySelectorAll('.ov-mode').forEach(b=>b.classList.toggle('is-on',b===btn));document.getElementById('ovTip').textContent=ovMode==='select'?'Click rooms or groups to select them.':ovMode==='link'?'Click two rooms or groups to connect them immediately.':ovMode==='unlink'?'Click a connection to choose the actual route to remove.':'Drag rooms or groups. Shift-click to select several. Use + / − to expand or collapse groups.';renderOverview();}));
   document.getElementById('ovAddRoom').addEventListener('click',()=>{const st=blankState('location');st.fields.useMap=true;if(cur().fields.isGroup)st.fields.parentId=cur().id;S.location.list.push(st);S.location.active=S.location.list.length-1;hydrate();nameInput.focus();});
@@ -4092,7 +4162,10 @@ function removeRelationshipsFor(id){
   if(RELATIONSHIPS.length!==before) autosave();
 }
 function pruneRelationships(){
-  const ids = new Set(relationshipCharacters().map(c=>c.id));
+  /* only drop links to characters that no longer exist; a name that is blank
+     for a moment (mid-edit) must not delete the character's relationships */
+  const ids = new Set();
+  ["main","side"].forEach(kind=>S[kind].list.forEach(st=>{ if(!st.id) st.id = wwId(kind); ids.add(st.id); }));
   const before = RELATIONSHIPS.length;
   RELATIONSHIPS = RELATIONSHIPS.filter(r=>ids.has(r.from) && ids.has(r.to) && r.from!==r.to);
   Object.keys(REL_POS).forEach(id=>{ if(!ids.has(id)) delete REL_POS[id]; });
@@ -4321,11 +4394,18 @@ function wireRelationshipGraph(){
   svg.addEventListener("pointerdown",e=>{
     const node=e.target.closest && e.target.closest(".rg-node"); if(!node)return;
     const id=node.dataset.id,p=REL_POS[id],m=point(e); if(!p)return;
-    rgDrag={id:id,dx:m.x-p.x,dy:m.y-p.y,moved:false}; svg.setPointerCapture&&svg.setPointerCapture(e.pointerId); e.preventDefault();
+    rgDrag={id:id,dx:m.x-p.x,dy:m.y-p.y,moved:false,sx:e.clientX,sy:e.clientY}; svg.setPointerCapture&&svg.setPointerCapture(e.pointerId); e.preventDefault();
   });
   svg.addEventListener("pointermove",e=>{
-    if(!rgDrag)return; const m=point(e); REL_POS[rgDrag.id]={x:Math.max(88,Math.min(912,Math.round(m.x-rgDrag.dx))),y:Math.max(42,Math.min(518,Math.round(m.y-rgDrag.dy)))}; rgDrag.moved=true; renderRelationshipGraph();
+    if(!rgDrag)return; if(!rgDrag.moved && Math.hypot(e.clientX-rgDrag.sx,e.clientY-rgDrag.sy)<3)return; const m=point(e); REL_POS[rgDrag.id]={x:Math.max(88,Math.min(912,Math.round(m.x-rgDrag.dx))),y:Math.max(42,Math.min(518,Math.round(m.y-rgDrag.dy)))}; rgDrag.moved=true; renderRelationshipGraph();
   });
+  /* double-click is detected here: pointer capture retargets the native
+     dblclick to the <svg>, so it never names the node */
+  let lastUp=null, dblHandledAt=0;
+  const openNode=id=>{
+    const c=relationshipCharMap()[id]; if(!c||!S[c.kind])return;
+    dblHandledAt=Date.now(); S[c.kind].active=c.index; setMode(c.kind);
+  };
   const end=()=>{
     if(!rgDrag)return;
     const id=rgDrag.id, moved=rgDrag.moved;
@@ -4333,12 +4413,16 @@ function wireRelationshipGraph(){
     rgDrag=null;
     if(!moved){
       clearTimeout(rgClickTimer);
+      const now=Date.now();
+      if(lastUp && lastUp.id===id && now-lastUp.t<400){ lastUp=null; openNode(id); return; }
+      lastUp={id:id,t:now};
       rgClickTimer=setTimeout(()=>pickRelationshipNode(id),190);
-    }
+    }else lastUp=null;
   };
   svg.addEventListener("pointerup",end); svg.addEventListener("pointercancel",()=>{ if(rgDrag&&rgDrag.moved)autosave(); rgDrag=null; });
   svg.addEventListener("dblclick",e=>{
     clearTimeout(rgClickTimer);
+    if(Date.now()-dblHandledAt<600)return;
     const node=e.target.closest && e.target.closest(".rg-node"); if(!node)return;
     const kind=node.dataset.kind,index=Number(node.dataset.index); if(!S[kind]||!Number.isFinite(index))return;
     S[kind].active=index; setMode(kind);
@@ -4399,6 +4483,57 @@ let projectReady = false;
 let projectSaveTimer = null;
 let projectSavePromise = Promise.resolve();
 let suppressProjectSave = false;
+/* ---- cross-tab guard: two tabs on one project would silently overwrite each
+   other. After a save, tell other tabs; a tab that has that project open stops
+   autosaving it until reloaded (or until it switches project). ---- */
+const PROJECT_TAB_ID = "tab_"+Math.random().toString(36).slice(2)+Date.now().toString(36);
+const PROJECT_SAVED_KEY = "writers-workbench-project-saved-v1";
+let projectStale = false;
+let projectChannel = null;
+/* the open project's record minus its state, so a save on page exit can be a
+   single put (no read first): a closing page may not get to run callbacks */
+let projectRecCache = null;
+function cacheProjectRec(rec){
+  if(!rec || typeof rec!=="object"){ projectRecCache=null; return; }
+  const meta = Object.assign({}, rec); delete meta.state;
+  projectRecCache = meta;
+}
+function onOtherTabSaved(m){
+  if(!m || typeof m!=="object" || m.tab===PROJECT_TAB_ID || m.type!=="saved") return;
+  if(projectReady && m.id && m.id===currentProjectId) markProjectStale();
+}
+try{
+  if(typeof BroadcastChannel==="function"){
+    projectChannel = new BroadcastChannel("writers-workbench-projects");
+    projectChannel.onmessage = e=>onOtherTabSaved(e.data);
+  }
+}catch(_){ projectChannel = null; }
+/* fallback (and file:// pages, where BroadcastChannel may not reach other tabs) */
+window.addEventListener("storage", e=>{
+  if(e.key!==PROJECT_SAVED_KEY || !e.newValue) return;
+  try{ onOtherTabSaved(JSON.parse(e.newValue)); }catch(_){}
+});
+function announceProjectSaved(id){
+  const m = {type:"saved", id:id, tab:PROJECT_TAB_ID, t:Date.now()};
+  if(projectChannel){ try{ projectChannel.postMessage(m); }catch(_){} }
+  if(localStorageOK){ try{ localStorage.setItem(PROJECT_SAVED_KEY, JSON.stringify(m)); }catch(_){} }
+}
+function markProjectStale(){
+  if(projectStale) return;
+  if(projectSaveTimer){ clearTimeout(projectSaveTimer); projectSaveTimer=null; }
+  setSaveStatus("Autosave off — this project was changed in another tab. Reload to see the latest.",false);
+  projectStale = true;
+  const el = document.getElementById("saveStatus");
+  if(el) el.title = "Another tab saved this project. Edits here won't be saved. Reload this tab to see the latest version.";
+  toast("This project was changed in another tab. Reload to see the latest — edits here won't be saved.");
+  clearTimeout(tid); tid = setTimeout(()=>$("#toast").classList.remove("show"), 7000);
+}
+function clearProjectStale(){
+  if(!projectStale) return;
+  projectStale = false;
+  const el = document.getElementById("saveStatus");
+  if(el) el.title = "Browser autosave status. Download a JSON backup to keep a separate copy.";
+}
 let localStorageOK = false;
 try{
   const probe = "__ww_probe__";
@@ -4434,6 +4569,7 @@ function emptyProjectState(){
 function setSaveStatus(text, dim){
   const el = $("#saveStatus");
   if(!el) return;
+  if(projectStale) return; /* the "changed in another tab" warning stays until it's resolved */
   el.textContent = text;
   el.style.opacity = dim ? "0.55" : "1";
 }
@@ -4493,14 +4629,15 @@ function applyProjectState(d){
   if(!d || !d.rosters) return;
   Object.keys(S).forEach(k=>{
     const r=d.rosters[k];
-    if(r && Array.isArray(r.list) && r.list.length){
-      S[k].list=r.list.map(x=>coerce(x,k));
+    const items=r && Array.isArray(r.list) ? r.list.filter(x=>x && typeof x==="object" && !Array.isArray(x)) : [];
+    if(items.length){
+      S[k].list=items.map(x=>coerce(x,k));
       S[k].active=Math.min(Math.max(0,r.active|0),S[k].list.length-1);
     }
   });
   if(Array.isArray(d.relationships)){
     RELATIONSHIPS=d.relationships.filter(r=>r&&typeof r==="object").map(r=>({
-      id:r.id||wwId("rel"), from:r.from||"", to:r.to||"",
+      id:typeof r.id==="string"&&r.id?r.id:wwId("rel"), from:typeof r.from==="string"?r.from:"", to:typeof r.to==="string"?r.to:"",
       label:typeof r.label==="string"?r.label:"", reciprocal:r.reciprocal!==false
     }));
   }
@@ -4514,7 +4651,7 @@ function applyProjectState(d){
   });
   if($("#mainConstant")) $("#mainConstant").checked=!!d.mainConstant;
   if(typeof d.hideEmpty==="boolean") $("#hideEmpty").checked=d.hideEmpty;
-  if(d.mode && S[d.mode]) mode=d.mode;
+  if(typeof d.mode==="string" && Object.hasOwn(S,d.mode)) mode=d.mode;
 }
 
 async function refreshProjectSelect(){
@@ -4532,33 +4669,54 @@ async function refreshProjectSelect(){
   return rows;
 }
 
-function writeCurrentProject(){
-  if(!projectDB || !currentProjectId || suppressProjectSave) return projectSavePromise;
+function writeCurrentProject(onExit){
+  if(!projectDB || !currentProjectId || suppressProjectSave || projectStale) return projectSavePromise;
   // Capture both the project id and its state before any async database work.
   // This prevents a fast project switch from ever writing Project B into Project A.
   const id=currentProjectId;
   const state=JSON.parse(JSON.stringify(snapshot()));
-  projectSavePromise=projectSavePromise.then(async()=>{
-    try{
-      const old=await dbGetProject(id);
-      if(!old) return;
-      old.state=state;
-      old.updatedAt=Date.now();
-      await dbPutProject(old);
-      if(id===currentProjectId){
-        const t=new Date();
-        setSaveStatus("Saved locally "+String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0"),true);
+  // The read-modify-write runs in ONE transaction opened right now (not after a
+  // promise hop), so a save started from pagehide still reaches the database, and
+  // saves land in the order they were made.
+  let done;
+  try{
+    done=new Promise((resolve,reject)=>{
+      const tx=projectDB.transaction(PROJECT_STORE,"readwrite"), store=tx.objectStore(PROJECT_STORE);
+      let wrote=false;
+      if(onExit && projectRecCache && projectRecCache.id===id){
+        store.put(Object.assign({}, projectRecCache, {state:state, updatedAt:Date.now()})); wrote=true;
+      }else{
+        const req=store.get(id);
+        req.onsuccess=()=>{
+          const old=req.result;
+          if(!old) return;
+          if(id===currentProjectId) cacheProjectRec(old);
+          old.state=state;
+          old.updatedAt=Date.now();
+          store.put(old); wrote=true;
+        };
       }
-    }catch(err){
-      console.error(err);
-      if(id===currentProjectId) setSaveStatus("Project autosave failed",false);
+      tx.oncomplete=()=>resolve(wrote);
+      tx.onerror=()=>reject(tx.error || new Error("Project save failed"));
+      tx.onabort=()=>reject(tx.error || new Error("Project save aborted"));
+    });
+  }catch(err){ done=Promise.reject(err); }
+  projectSavePromise=projectSavePromise.then(()=>done).then(wrote=>{
+    if(!wrote) return;
+    announceProjectSaved(id);
+    if(id===currentProjectId){
+      const t=new Date();
+      setSaveStatus("Saved locally "+String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0"),true);
     }
+  }).catch(err=>{
+    console.error(err);
+    if(id===currentProjectId) setSaveStatus("Project autosave failed",false);
   });
   return projectSavePromise;
 }
 
 function autosave(){
-  if(!projectReady || suppressProjectSave) return;
+  if(!projectReady || suppressProjectSave || projectStale) return;
   clearTimeout(projectSaveTimer);
   projectSaveTimer=setTimeout(()=>{ projectSaveTimer=null; writeCurrentProject(); },400);
 }
@@ -4568,19 +4726,40 @@ async function flushProjectSave(){
   await writeCurrentProject();
 }
 
+/* Load a project's saved state into the editor. Throws (after putting back
+   whatever was open before) if it can't be loaded, and never leaves
+   currentProjectId / the remembered active project pointing at a broken one. */
 async function switchProject(id, saveFirst=true){
   if(!projectDB || !id || id===currentProjectId && projectReady) return;
   if(saveFirst && projectReady) await flushProjectSave();
   const rec=await dbGetProject(id);
   if(!rec) return;
+  const previous=projectReady ? JSON.parse(JSON.stringify(snapshot())) : null;
   suppressProjectSave=true;
+  try{
+    applyProjectState(rec.state);
+    setMode(mode);
+  }catch(err){
+    console.error("Could not open project", id, err);
+    if(previous){ try{ applyProjectState(previous); setMode(mode); }catch(e2){ console.error(e2); } }
+    suppressProjectSave=false;
+    try{ await refreshProjectSelect(); }catch(_){}
+    const msg="Couldn't open ‘"+(rec.name||projectNameFallback())+"’: its saved data is damaged."+(previous?" Your current project is still open.":"");
+    toast(msg);
+    const e=new Error(msg); e.wwToasted=true; throw e;
+  }finally{
+    suppressProjectSave=false;
+  }
   currentProjectId=id;
+  cacheProjectRec(rec);
+  clearProjectStale();
   if(localStorageOK){ try{ localStorage.setItem(ACTIVE_PROJECT_KEY,id); }catch(_){} }
-  applyProjectState(rec.state);
   await refreshProjectSelect();
-  setMode(mode);
-  suppressProjectSave=false;
   setSaveStatus("Project loaded",true);
+}
+function toastProjectError(err){
+  console.warn(err);
+  if(!(err && err.wwToasted)) toast(err && err.message ? err.message : "Something went wrong with that project");
 }
 
 async function createProject(name, state){
@@ -4601,7 +4780,7 @@ async function newProject(){
   const name=prompt("New project name:","New Project");
   if(name===null) return;
   const rec=await createProject(name);
-  await switchProject(rec.id,false);
+  try{ await switchProject(rec.id,false); }catch(err){ toastProjectError(err); return; }
   toast("Created "+rec.name);
 }
 
@@ -4611,7 +4790,7 @@ async function renameProject(){
   if(name===null || !name.trim()) return;
   const rows=(await dbListProjects()).filter(r=>r.id!==rec.id);
   rec.name=uniqueProjectName(name.trim(),rows); rec.updatedAt=Date.now();
-  await dbPutProject(rec); await refreshProjectSelect(); toast("Project renamed");
+  await dbPutProject(rec); if(rec.id===currentProjectId) cacheProjectRec(rec); await refreshProjectSelect(); toast("Project renamed");
 }
 
 async function duplicateProject(){
@@ -4926,10 +5105,38 @@ async function importProjectBackupFile(file){
     return;
   }
   else throw new Error("Not a Workbench project backup or a SillyTavern lorebook");
+  validateProjectState(state);
   await flushProjectSave();
-  const rec=await createProject((name||"Imported Project")+" — Imported",state);
-  await switchProject(rec.id,false);
+  const rec=await createProject((typeof name==="string" && name.trim() ? name : "Imported Project")+" — Imported",state);
+  try{ await switchProject(rec.id,false); }
+  catch(err){ await dbDeleteProject(rec.id).catch(()=>{}); await refreshProjectSelect().catch(()=>{}); throw err; }
   toast("Imported "+rec.name);
+}
+
+/* Check a backup's state before a project is created from it. coerce() is
+   tolerant, so this only rejects what isn't a project at all. */
+function validateProjectState(state){
+  if(!state || typeof state!=="object" || Array.isArray(state) || !state.rosters || typeof state.rosters!=="object" || Array.isArray(state.rosters))
+    throw new Error("That backup has no project data in it");
+  let entries=0;
+  Object.keys(S).forEach(k=>{
+    const r=state.rosters[k];
+    if(r==null) return;
+    if(typeof r!=="object" || !Array.isArray(r.list)) throw new Error("That backup's "+k+" roster is damaged");
+    r.list.forEach(x=>{ if(x && typeof x==="object" && !Array.isArray(x)){ const st=coerce(x,k); cardMd(st,k,true); entries++; } });
+  });
+  if(!entries) throw new Error("That backup has no entries in it");
+}
+
+/* Open the first project in `rows` that loads. If none do, start a fresh one. */
+async function openFirstLoadableProject(rows){
+  for(const r of rows){
+    try{ await switchProject(r.id,false); }catch(err){ console.warn(err); continue; }
+    if(currentProjectId===r.id) return r;
+  }
+  const fresh=await createProject("My Project");
+  await switchProject(fresh.id,false);
+  return fresh;
 }
 
 async function deleteCurrentProject(){
@@ -4943,7 +5150,8 @@ async function deleteCurrentProject(){
   }else{
     await dbDeleteProject(rec.id);
     rows=sortProjects((await dbListProjects()));
-    await switchProject(rows[0].id,false);
+    const opened=await openFirstLoadableProject(rows);
+    if(opened.id!==rows[0].id){ toast("Project deleted. Opened ‘"+(opened.name||projectNameFallback())+"’"); return; }
   }
   toast("Project deleted");
 }
@@ -4956,7 +5164,9 @@ function closeProjectMenu(){
 
 function wireProjectControls(){
   const sel=document.getElementById("projectSelect");
-  if(sel) sel.addEventListener("change",()=>switchProject(sel.value,true));
+  if(sel) sel.addEventListener("change",()=>{
+    switchProject(sel.value,true).catch(err=>{ toastProjectError(err); refreshProjectSelect().catch(()=>{}); });
+  });
   document.getElementById("projectNew").addEventListener("click",newProject);
   const menuBtn=document.getElementById("projectMenuBtn"), menu=document.getElementById("projectMenu");
   menuBtn.addEventListener("click",e=>{ e.stopPropagation(); menu.hidden=!menu.hidden; menuBtn.setAttribute("aria-expanded",String(!menu.hidden)); });
@@ -4989,18 +5199,17 @@ async function initProjectSystem(){
     rows=sortProjects(rows);
     let active=localStorageOK ? localStorage.getItem(ACTIVE_PROJECT_KEY) : "";
     if(!rows.some(r=>r.id===active)) active=rows[0].id;
-    currentProjectId=active;
-    const rec=await dbGetProject(active);
-    suppressProjectSave=true;
-    applyProjectState(rec && rec.state ? rec.state : emptyProjectState());
-    await refreshProjectSelect();
-    setMode(mode);
-    suppressProjectSave=false;
+    /* the remembered project first, then the others: one damaged save must not lock you out */
+    const order=rows.filter(r=>r.id===active).concat(rows.filter(r=>r.id!==active));
+    const rec=await openFirstLoadableProject(order);
     projectReady=true;
-    if(localStorageOK){ try{ localStorage.setItem(ACTIVE_PROJECT_KEY,active); }catch(_){} }
     setSaveStatus("Autosave on",true);
     if(migrated) toast("Moved your previous workspace into Recovered Project");
-    else toast("Opened "+((rec&&rec.name)||"project"));
+    else if(rec.id!==active){
+      const bad=rows.find(r=>r.id===active);
+      toast("Couldn't open ‘"+((bad&&bad.name)||projectNameFallback())+"’ (its saved data is damaged), so opened ‘"+(rec.name||projectNameFallback())+"’ instead");
+    }
+    else toast("Opened "+(rec.name||"project"));
   }catch(err){
     console.error(err);
     projectReady=false;
@@ -5013,6 +5222,13 @@ async function initProjectSystem(){
 document.addEventListener("visibilitychange",()=>{
   if(document.hidden && projectReady) flushProjectSave();
 });
+/* closing or reloading inside the 400ms autosave debounce used to lose those
+   edits; writeCurrentProject opens its transaction synchronously, so it lands */
+function flushProjectSaveOnExit(){
+  if(projectReady && projectSaveTimer){ clearTimeout(projectSaveTimer); projectSaveTimer=null; writeCurrentProject(true); }
+}
+window.addEventListener("pagehide",flushProjectSaveOnExit);
+window.addEventListener("beforeunload",flushProjectSaveOnExit);
 
 function hydrate(){
   pruneRelationships();
@@ -5051,9 +5267,12 @@ $("#btnWipe").addEventListener("click", async ()=>{
   const projectName = rec && rec.name ? rec.name : "this project";
   if(!confirm("Clear ‘"+projectName+"’? This erases the current project's characters, lore, maps, and relationship graph, but your other projects stay untouched.")) return;
   suppressProjectSave=true;
-  resetWorkspaceData();
-  setMode("main");
-  suppressProjectSave=false;
+  try{
+    resetWorkspaceData();
+    setMode("main");
+  }finally{
+    suppressProjectSave=false;
+  }
   if(projectReady) await writeCurrentProject();
   setSaveStatus("Project cleared", true);
   toast("Cleared "+projectName);
@@ -5061,8 +5280,9 @@ $("#btnWipe").addEventListener("click", async ()=>{
 
 document.addEventListener("keydown", e=>{
   if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="s"){
-    if($("#form-credits").hidden === false || $("#form-guide").hidden === false || $("#form-relationships").hidden === false) return;
-    e.preventDefault(); $("#btnSave").click();
+    e.preventDefault(); /* never fall through to the browser's Save Page dialog */
+    if($("#form-credits").hidden === false || $("#form-guide").hidden === false || $("#form-relationships").hidden === false || ($("#form-live") && $("#form-live").hidden === false)) return;
+    $("#btnSave").click();
   }
 });
 
@@ -5094,7 +5314,15 @@ function normalizeExternalCard(payload){
   });
   if(data.alternate_greetings!=null && (!Array.isArray(data.alternate_greetings) || data.alternate_greetings.some(x=>typeof x!=='string')))
     throw new Error('Alternate greetings must be a list of text messages.');
-  return cardClone(data);
+  return cardNormalizeNewlines(cardClone(data));
+}
+/* textareas report \n line breaks only, so stored text must match or
+   selection offsets (Move selected text) point at the wrong passage */
+function cardNormalizeNewlines(data){
+  const fix = t => typeof t==='string' ? t.replace(/\r\n?/g,'\n') : t;
+  CARD_TEXT_FIELDS.forEach(([key])=>{ if(typeof data[key]==='string') data[key]=fix(data[key]); });
+  if(Array.isArray(data.alternate_greetings)) data.alternate_greetings=data.alternate_greetings.map(fix);
+  return data;
 }
 function cardBytesToBase64(bytes){
   let text='';
@@ -5149,12 +5377,15 @@ function cardPngChunk(type,body){
 }
 function cardExportPng(original,payload){
   const chunks=cardPngChunks(original);
-  const key=payload.spec==='chara_card_v3'?'ccv3':'chara';
-  const metadata=cardPngChunk('tEXt',new TextEncoder().encode(key+'\0'+cardBytesToBase64(new TextEncoder().encode(JSON.stringify(payload)))));
+  const textChunk=(key,obj)=>cardPngChunk('tEXt',new TextEncoder().encode(key+'\0'+cardBytesToBase64(new TextEncoder().encode(JSON.stringify(obj)))));
+  // Like SillyTavern: a v3 card carries both a v2 'chara' chunk (for older readers) and 'ccv3'.
+  const metadata=payload.spec==='chara_card_v3'
+    ? [textChunk('chara',Object.assign(cardClone(payload),{spec:'chara_card_v2',spec_version:'2.0'})),textChunk('ccv3',payload)]
+    : [textChunk('chara',payload)];
   const parts=[original.subarray(0,8)];
   for(const c of chunks){
     if(['chara','ccv3'].includes(cardPngKeyword(c))) continue;
-    if(c.type==='IEND') parts.push(metadata);
+    if(c.type==='IEND') parts.push(...metadata);
     parts.push(c.raw);
   }
   const result=new Uint8Array(parts.reduce((n,p)=>n+p.length,0)); let offset=0;
@@ -6797,6 +7028,18 @@ button:focus-visible{
   padding:8px 10px;
   font-size:11px;
 }
+/* + New / Duplicate stay in view while the chips scroll sideways */
+.roster-actions{
+  display:flex;
+  gap:8px;
+  flex:none;
+  position:sticky;
+  right:-16px;
+  z-index:2;
+  margin-right:-16px;
+  padding:0 16px 0 8px;
+  background:inherit;
+}
 .roster-meta{
   flex:none;
   width:auto;
@@ -6938,6 +7181,8 @@ button:focus-visible{
   gap:10px;
   margin-top:10px;
 }
+.ww-progress-line progress[hidden],
+.ww-progress-line [hidden]{display:none!important}
 .ww-progress-line progress{
   appearance:none;
   -webkit-appearance:none;
@@ -7348,6 +7593,9 @@ html[data-theme="paper"] #overviewSvg .room.active{fill:rgba(154,100,20,.18)}
 html[data-theme="paper"] #overviewSvg .room.orphan{fill:rgba(93,74,45,.05)}
 html[data-theme="paper"] .cluster-boundary{fill:rgba(31,122,110,.07)}
 html[data-theme="paper"] .map-window summary{color:#2f6b8f}
+html[data-theme="paper"] .map-cell.win{color:#2f6b8f;box-shadow:inset 0 0 0 1px #7fa3bf}
+html[data-theme="paper"] .map-window-fields input,
+html[data-theme="paper"] .map-window-fields select{color-scheme:light}
 html[data-theme="paper"] #toast{background:rgba(253,248,236,.98);border-color:#b3a37e;box-shadow:var(--ww-shadow)}
 html[data-theme="paper"] .wi-panel,
 html[data-theme="paper"] .wi-section{border-top-color:var(--line)}
