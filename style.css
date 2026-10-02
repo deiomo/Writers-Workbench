@@ -1,0 +1,4 @@
+.wwb-status { font-size: 0.9em; opacity: 0.85; margin: 4px 0 8px; }
+.wwb-status .wwb-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #888; vertical-align: middle; }
+.wwb-status.live .wwb-dot { background: #4caf82; }
+.wwb-log { font-family: monospace; font-size: 0.8em; max-height: 140px; overflow-y: auto; opacity: 0.8; white-space: pre-wrap; }
