@@ -1560,6 +1560,7 @@ pre#out .h{color:var(--accent)}
         <label class="toggle"><input type="checkbox" id="liveMain"> Main characters</label>
         <label class="toggle"><input type="checkbox" id="liveRelationships" checked> Relationship graph (always on in chat)</label>
         <p class="hint">Unticking something removes the Workbench's copy from the lorebook on the next sync, and switching the active scenario swaps it out. Pausing Live removes nothing.</p>
+        <p class="hint"><strong>Lorebooks not made by the Workbench:</strong> if you import one to sync it, every entry that isn't in Workbench format goes into Concepts, and on the first sync it's rewritten in SillyTavern wrapped in Concept XML tags and renamed "[Concept] Name". Back the lorebook up first if you want to keep its original format. You'll be asked before anything happens.</p>
       </section>
 
       <section class="live-card">
@@ -2866,11 +2867,20 @@ function liveInit(){
       const missing = all.filter(e=>typeof e.wwId !== 'string' || !(mine.has(e.wwId) ||
         (e.wwId === 'ww-relationships' && e.wwProject === (currentProjectId || 'default')))).length;
       if(missing){
+        const r = lorebookToProjectState(Object.assign({ name:book }, read.data), { keepIds:true });
+        const nf = r.foreign.length;
+        const sample = r.foreign.slice(0, 3).map(n=>'"'+n+'"').join(', ') + (nf > 3 ? ' and '+(nf-3)+' more' : '');
+        const warnForeign = nf
+          ? '⚠ WARNING: '+nf+(nf===1 ? ' entry isn\'t' : ' entries aren\'t')+' in Writer\'s Workbench format ('+sample+').\n'
+            + 'If you import, '+(nf===1 ? 'it goes' : 'they all go')+' into the Concepts category, and on the first sync '+(nf===1 ? 'its text is' : 'their text is')
+            + ' rewritten in SillyTavern: wrapped in Concept XML tags (<Name>, <Name_identity>, <Name_what_it_is>…) and renamed "[Concept] Name". '
+            + 'The original wording is kept inside the tags, but the old formatting isn\'t. Back up the lorebook first if you want to keep it as it is.\n\n'
+          : '';
         const pull = confirm('"'+book+'" has '+missing+(missing===1 ? ' entry' : ' entries')+' the Workbench doesn\'t have.\n\n'
-          + 'Import the whole lorebook into a new project and keep it in sync? Entries the Workbench didn\'t make go to Concepts and are rewritten in Workbench format on the first sync.\n\n'
-          + 'Cancel keeps your current project and syncs it into this lorebook alongside what\'s there.');
+          + warnForeign
+          + 'Import the whole lorebook into a new project and keep it in sync?\n\n'
+          + 'Cancel keeps your current project and syncs it into this lorebook alongside what\'s there'+(nf ? ', leaving '+(nf===1 ? 'that entry' : 'those entries')+' untouched' : '')+'.');
         if(pull){
-          const r = lorebookToProjectState(Object.assign({ name:book }, read.data), { keepIds:true });
           await flushProjectSave();
           const rec = await createProject(book+' — Live', r.state);
           try{ await switchProject(rec.id, false); }
@@ -6017,7 +6027,9 @@ function parsePastedCharacter(text, kind){
 
     const kvDest = (target||'').startsWith('kv>') ? target.slice(3) : null;
     if(target === 'kv' || kvDest || !target){
-      const { fields, lists, leftover } = pasteKeyValues(body, kind, name);
+      // in a known section, a second paragraph of a long-text value belongs to that value,
+      // not to the section's catch-all field ("Anything else" in Body & intimate details)
+      const { fields, lists, leftover } = pasteKeyValues(body, kind, name, !!target);
       Object.entries(fields).forEach(([k,v])=>{
         if(k === '@name'){ if(!name){ name = v; proposals.push({label:'Name', apply:{kind:'name', value:v}, preview:v}); } return; }
         if(seen.has('f:'+k)) return; seen.add('f:'+k);
@@ -6054,9 +6066,14 @@ function parsePastedCharacter(text, kind){
         return !!(PM.labels[lk] || PM.listLabels[lk]);
       };
       const bullets = pasteBullets(body).filter(x=>!isLabelled(x));
-      const items = (bullets.length ? bullets
-        : body.split(/\r?\n{2,}/).map(x=>x.trim()).filter(Boolean))
+      // labelled long texts in the same block (Core belief:, …) keep their later paragraphs
+      const kvList = pasteKeyValues(body, kind, name, true);
+      let items = (bullets.length ? bullets
+        : kvList.leftover.split(/\n{2,}/).map(x=>x.trim()).filter(Boolean))
         .filter(x=>!isLabelled(x));
+      // a main character's own lines are exported as "Name to …"
+      const own = String(name||'').trim() + ' to ';
+      if(k === 'relationships' && kind === 'main' && name) items = items.map(x=>x.startsWith(own) ? x.slice(own.length) : x);
       if(!seen.has('l:'+k)){ seen.add('l:'+k); pushList(k, items, prettyLabel(k)); }
       // prose next to the bullets (not part of an item or a label) is kept in Notes
       if(bullets.length){
@@ -6077,7 +6094,7 @@ function parsePastedCharacter(text, kind){
         }
       }
       // labelled extras inside the block (Core belief:, Kinks:, …)
-      const { fields, lists } = pasteKeyValues(body, kind, name);
+      const { fields, lists } = kvList;
       Object.entries(fields).forEach(([fk,v])=>{ if(fk!=='@name' && !seen.has('f:'+fk)){ seen.add('f:'+fk); pushField(fk, v, prettyLabel(fk)); } });
       Object.entries(lists).forEach(([lk,v])=>{ if(lk!==k && !seen.has('l:'+lk)){ seen.add('l:'+lk); pushList(lk, v, prettyLabel(lk)); } });
       return;
@@ -8008,6 +8025,42 @@ html[data-theme="paper"] .cluster-dialog{background:rgba(31,122,110,.06)}
   reader.setAttribute("aria-label", "Formatted card preview");
   reader.tabIndex = 0;
   output.insertAdjacentElement("afterend", reader);
+
+  /* Copying from the Reading view: the whole card copies as the exact export, and a
+     partial selection keeps its headings and bullets, so "Paste text" can read it back. */
+  reader.addEventListener("copy", event => {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || sel.isCollapsed || !event.clipboardData) return;
+    let text;
+    if (sel.toString().replace(/\s+/g, " ").trim() === reader.innerText.replace(/\s+/g, " ").trim()) {
+      text = output.textContent;
+    } else {
+      const box = document.createElement("div");
+      for (let i = 0; i < sel.rangeCount; i++) box.append(sel.getRangeAt(i).cloneContents());
+      const blocks = [];
+      const walk = el => {
+        for (const n of el.childNodes) {
+          if (n.nodeType === 3) { if (n.textContent.trim()) blocks.push(n.textContent.trim()); continue; }
+          if (n.nodeType !== 1 || n.classList.contains("ww-doc-eyebrow")) continue;
+          const t = n.textContent.trim();
+          if (n.tagName === "H1") { if (t) blocks.push("# " + t); }
+          else if (n.tagName === "H2" || n.tagName === "H3") { if (t) blocks.push("## " + t); }
+          else if (n.tagName === "UL" || n.tagName === "OL") {
+            const items = [...n.children].map(li => "- " + li.textContent.trim()).filter(x => x.length > 2);
+            if (items.length) blocks.push(items.join("\n"));
+          }
+          else if (n.tagName === "LI") { if (t) blocks.push("- " + t); }
+          else if (n.tagName === "P") { if (t) blocks.push(n.textContent.replace(/^\s+|\s+$/g, "")); }
+          else walk(n);
+        }
+      };
+      walk(box);
+      text = blocks.join("\n\n");
+    }
+    if (!text) return;
+    event.clipboardData.setData("text/plain", text);
+    event.preventDefault();
+  });
 
   /* ---------- lightweight, safe Markdown reading view ----------
      Handles the headings, paragraphs, and bullet lists emitted
