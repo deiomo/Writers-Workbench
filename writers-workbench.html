@@ -6027,7 +6027,9 @@ function parsePastedCharacter(text, kind){
 
     const kvDest = (target||'').startsWith('kv>') ? target.slice(3) : null;
     if(target === 'kv' || kvDest || !target){
-      const { fields, lists, leftover } = pasteKeyValues(body, kind, name);
+      // in a known section, a second paragraph of a long-text value belongs to that value,
+      // not to the section's catch-all field ("Anything else" in Body & intimate details)
+      const { fields, lists, leftover } = pasteKeyValues(body, kind, name, !!target);
       Object.entries(fields).forEach(([k,v])=>{
         if(k === '@name'){ if(!name){ name = v; proposals.push({label:'Name', apply:{kind:'name', value:v}, preview:v}); } return; }
         if(seen.has('f:'+k)) return; seen.add('f:'+k);
@@ -6064,9 +6066,14 @@ function parsePastedCharacter(text, kind){
         return !!(PM.labels[lk] || PM.listLabels[lk]);
       };
       const bullets = pasteBullets(body).filter(x=>!isLabelled(x));
-      const items = (bullets.length ? bullets
-        : body.split(/\r?\n{2,}/).map(x=>x.trim()).filter(Boolean))
+      // labelled long texts in the same block (Core belief:, …) keep their later paragraphs
+      const kvList = pasteKeyValues(body, kind, name, true);
+      let items = (bullets.length ? bullets
+        : kvList.leftover.split(/\n{2,}/).map(x=>x.trim()).filter(Boolean))
         .filter(x=>!isLabelled(x));
+      // a main character's own lines are exported as "Name to …"
+      const own = String(name||'').trim() + ' to ';
+      if(k === 'relationships' && kind === 'main' && name) items = items.map(x=>x.startsWith(own) ? x.slice(own.length) : x);
       if(!seen.has('l:'+k)){ seen.add('l:'+k); pushList(k, items, prettyLabel(k)); }
       // prose next to the bullets (not part of an item or a label) is kept in Notes
       if(bullets.length){
@@ -6087,7 +6094,7 @@ function parsePastedCharacter(text, kind){
         }
       }
       // labelled extras inside the block (Core belief:, Kinks:, …)
-      const { fields, lists } = pasteKeyValues(body, kind, name);
+      const { fields, lists } = kvList;
       Object.entries(fields).forEach(([fk,v])=>{ if(fk!=='@name' && !seen.has('f:'+fk)){ seen.add('f:'+fk); pushField(fk, v, prettyLabel(fk)); } });
       Object.entries(lists).forEach(([lk,v])=>{ if(lk!==k && !seen.has('l:'+lk)){ seen.add('l:'+lk); pushList(lk, v, prettyLabel(lk)); } });
       return;
@@ -8018,6 +8025,42 @@ html[data-theme="paper"] .cluster-dialog{background:rgba(31,122,110,.06)}
   reader.setAttribute("aria-label", "Formatted card preview");
   reader.tabIndex = 0;
   output.insertAdjacentElement("afterend", reader);
+
+  /* Copying from the Reading view: the whole card copies as the exact export, and a
+     partial selection keeps its headings and bullets, so "Paste text" can read it back. */
+  reader.addEventListener("copy", event => {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || sel.isCollapsed || !event.clipboardData) return;
+    let text;
+    if (sel.toString().replace(/\s+/g, " ").trim() === reader.innerText.replace(/\s+/g, " ").trim()) {
+      text = output.textContent;
+    } else {
+      const box = document.createElement("div");
+      for (let i = 0; i < sel.rangeCount; i++) box.append(sel.getRangeAt(i).cloneContents());
+      const blocks = [];
+      const walk = el => {
+        for (const n of el.childNodes) {
+          if (n.nodeType === 3) { if (n.textContent.trim()) blocks.push(n.textContent.trim()); continue; }
+          if (n.nodeType !== 1 || n.classList.contains("ww-doc-eyebrow")) continue;
+          const t = n.textContent.trim();
+          if (n.tagName === "H1") { if (t) blocks.push("# " + t); }
+          else if (n.tagName === "H2" || n.tagName === "H3") { if (t) blocks.push("## " + t); }
+          else if (n.tagName === "UL" || n.tagName === "OL") {
+            const items = [...n.children].map(li => "- " + li.textContent.trim()).filter(x => x.length > 2);
+            if (items.length) blocks.push(items.join("\n"));
+          }
+          else if (n.tagName === "LI") { if (t) blocks.push("- " + t); }
+          else if (n.tagName === "P") { if (t) blocks.push(n.textContent.replace(/^\s+|\s+$/g, "")); }
+          else walk(n);
+        }
+      };
+      walk(box);
+      text = blocks.join("\n\n");
+    }
+    if (!text) return;
+    event.clipboardData.setData("text/plain", text);
+    event.preventDefault();
+  });
 
   /* ---------- lightweight, safe Markdown reading view ----------
      Handles the headings, paragraphs, and bullet lists emitted

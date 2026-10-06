@@ -10,6 +10,11 @@
 ### Added
 - Live sync warns you before importing a lorebook that wasn't made by the Workbench. It names the entries, explains that they'll go into Concepts and be rewritten in SillyTavern wrapped in Concept XML tags with a "[Concept]" name, and suggests backing the lorebook up first. The Live tab says the same.
 
+### Fixed: pasting a Workbench character back in
+- Fields written in more than one paragraph keep all their paragraphs. Before, only the first paragraph stayed. In Body & Intimate Details the rest piled up in "Anything else", in Psychology they became behavioural triggers, and elsewhere they were lost.
+- A main character's relationships no longer come back as "Name to …".
+- Copying from the Reading view now pastes back cleanly: the whole card copies as the exact export, and a partial selection keeps its headings and bullet points.
+
 ### Fixed: saving and projects
 - A damaged project or a bad backup can no longer lock you out of every project. The Workbench skips what it can't read, opens the next project that loads, and says what went wrong. Bad backups are rejected before a project is created.
 - Autosave no longer stops silently after a failed load.
