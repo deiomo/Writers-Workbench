@@ -15,7 +15,7 @@ See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
 1. SillyTavern → Extensions panel → **Install extension** → paste `https://github.com/deiomo/Writers-Workbench` → Install.
    (Manual install: copy this folder into `SillyTavern/data/<your-user>/extensions/` so that `extensions/Writers-Workbench/manifest.json` exists, then reload SillyTavern.)
 2. Wand menu → **Writer's Workbench**. It opens in a new tab, served by SillyTavern.
-3. In the Workbench, open the **Live** tab, pick a lorebook (or make a new one), and tick Live.
+3. In the Workbench, open the **Live** tab, pick a lorebook (or make a new one), and press **Start live sync**.
 4. In SillyTavern: World Info → activate that lorebook once.
 
 Requires SillyTavern 1.12.12 or newer. Full bridge details, including exactly what it will and won't touch, are in [BRIDGE.md](BRIDGE.md).

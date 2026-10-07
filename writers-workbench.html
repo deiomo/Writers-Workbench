@@ -315,8 +315,13 @@ header{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 22px
 .live-dot{width:10px;height:10px;border-radius:50%;background:var(--ink-faint);flex:none}
 .live-dot.ok{background:#4caf82}.live-dot.bad{background:var(--danger)}.live-dot.on{background:var(--accent);box-shadow:0 0 0 4px rgba(95,184,176,.18)}
 .live-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
-.live-onoff{display:inline-flex;align-items:center;gap:8px;font-weight:600;cursor:pointer}
-.live-onoff input{width:18px;height:18px;accent-color:var(--accent)}
+.live-go{display:inline-flex;align-items:center;gap:10px;padding:12px 22px;font-size:15px;font-weight:700;border-radius:8px;min-width:220px;justify-content:center}
+.live-go .live-go-dot{width:10px;height:10px;border-radius:50%;background:currentColor;opacity:.55;flex:none}
+#liveToggle.is-on,#liveToggle.is-on:hover{color:#0f2418;border-color:#3f9a70;background:linear-gradient(180deg,#6fd09f,#4caf82);box-shadow:0 0 0 4px rgba(76,175,130,.22)}
+#liveToggle.is-on .live-go-dot{opacity:1;background:#0f2418;animation:live-pulse 1.6s ease-in-out infinite}
+.live-go:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+@keyframes live-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.6);opacity:.45}}
+@media (prefers-reduced-motion:reduce){#liveToggle.is-on .live-go-dot{animation:none}}
 .live-status{margin:10px 0 0;color:var(--ink-dim);font-size:13px;line-height:1.5}
 .live-card .toggle{display:flex;margin:6px 0}
 .live-log{font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--ink-dim);max-height:220px;overflow-y:auto;white-space:pre-wrap}
@@ -1549,7 +1554,7 @@ pre#out .h{color:var(--accent)}
           <input id="liveBook" placeholder="new lorebook name" autocomplete="off" spellcheck="false" hidden>
           <button class="btn" id="liveSwitch" type="button" hidden>Switch</button>
         </div>
-        <label class="live-onoff"><input type="checkbox" id="liveToggle" disabled><span>Live</span></label>
+        <button type="button" class="btn primary live-go" id="liveToggle" aria-pressed="false" disabled><span class="live-go-dot" aria-hidden="true"></span><span class="live-go-label">Start live sync</span></button>
         <p class="live-status" id="liveStatus" role="status" aria-live="polite"></p>
       </section>
 
@@ -1573,7 +1578,7 @@ pre#out .h{color:var(--accent)}
         <ol class="live-list">
           <li>Install the Writer's Workbench Bridge extension in SillyTavern and reload it.</li>
           <li>Open this page from SillyTavern's wand menu. Opened as a local file, live sync stays off.</li>
-          <li>Pick a lorebook above, or choose New lorebook, then tick Live.</li>
+          <li>Pick a lorebook above, or choose New lorebook, then press <strong>Start live sync</strong>.</li>
           <li>Activate that lorebook once in SillyTavern's World Info.</li>
           <li>Keep the SillyTavern tab open while you work.</li>
         </ol>
@@ -2789,7 +2794,7 @@ function liveStop(status, logLine){
 function liveProjectChanged(){
   if(!liveOn || liveSwitching || !liveProjectId || liveProjectId === currentProjectId) return false;
   const book = liveTarget;
-  liveStop('Live paused: you switched projects. Tick Live to sync this project into "'+book+'".',
+  liveStop('Live paused: you switched projects. Press Start live sync to sync this project into "'+book+'".',
            'Paused: switched projects');
   return true;
 }
@@ -2797,6 +2802,23 @@ function liveProjectChanged(){
 function liveInit(){
   const toggle = $("#liveToggle");
   if(!toggle) return;
+  /* the Live button keeps the checkbox interface the rest of this code uses:
+     .checked is its on/off state, and a click flips it and fires 'change' */
+  let liveBtnOn = false;
+  Object.defineProperty(toggle, 'checked', {
+    get: ()=>liveBtnOn,
+    set: v=>{
+      liveBtnOn = !!v;
+      toggle.classList.toggle('is-on', liveBtnOn);
+      toggle.setAttribute('aria-pressed', String(liveBtnOn));
+      toggle.querySelector('.live-go-label').textContent = liveBtnOn ? 'LIVE · click to pause' : 'Start live sync';
+    }
+  });
+  toggle.addEventListener('click', ()=>{
+    toggle.checked = !toggle.checked;
+    if(toggle.checked) toggle.querySelector('.live-go-label').textContent = 'Starting…';
+    toggle.dispatchEvent(new Event('change'));
+  });
   liveLoadOptions();
   ["liveScenario","liveMain","liveRelationships"].forEach(id=>$("#"+id).addEventListener('change', ()=>{
     liveSaveOptions();
@@ -2890,7 +2912,7 @@ function liveInit(){
           const linked = await ask('link', { book:book, project:currentProjectId, links:links }, 8000);
           if(!linked){
             const was = liveOn ? ' Nothing was synced into "'+liveTarget+'" either.' : '';
-            liveStop('Imported "'+book+'" into a new project, but linking it to SillyTavern failed, so live sync is off. Nothing was synced.'+was+' Tick Live to try again.',
+            liveStop('Imported "'+book+'" into a new project, but linking it to SillyTavern failed, so live sync is off. Nothing was synced.'+was+' Press Start live sync to try again.',
                      'Linking "'+book+'" failed; live sync off');
             return false;
           }
@@ -2931,7 +2953,7 @@ function liveInit(){
       fillSelect(m.worlds);
       if(first){
         liveConn('Connected to SillyTavern'+(m.st ? ' '+m.st : '')+(m.version ? ' · bridge '+m.version : ''), 'ok');
-        if(!liveOn) liveStatus('Choose a lorebook, then tick Live.');
+        if(!liveOn) liveStatus('Choose a lorebook, then press Start live sync.');
       }
     }
     if(m.type === 'worlds'){ fillSelect(m.worlds); if(!liveOn) liveStatus('Lorebook list updated.'); }
@@ -2999,6 +3021,7 @@ function liveInit(){
       const ok = await commitTarget(book, false);
       toggle.disabled = false;
       if(!ok){ toggle.checked = false; return; }
+      toggle.checked = true;
       liveOn = true;
       $("#liveBadge").hidden = false;
       liveConn('Live: syncing into "'+liveTarget+'"', 'on');
