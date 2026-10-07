@@ -1788,7 +1788,7 @@ Ly must not suspect Mara without finding evidence.</pre>
         <h2>Using it</h2>
         <ul>
           <li>Type the name once. It fills the wrapper tag and every section tag in the output, so a character named Kou exports as <code>&lt;Kou&gt;</code> with sections like <code>&lt;Kou_backstory&gt;</code>.</li>
-          <li>Every field is optional. Empty sections are dropped from the output unless you turn off <em>Hide empty sections</em>.</li>
+          <li>Every field is optional. Empty sections are dropped from the output unless you turn off <em>Hide empty</em>.</li>
           <li>The <strong>Scenario</strong> tab holds setting blocks. They export as a lorebook with a single entry, always active by default. Use Lorebook settings to change activation and placement.</li>
           <li>The <strong>Locations</strong> tab exports a lorebook of keyed entries. Each fires when its trigger words appear — set them yourself for generic names like "the kitchen".</li>
           <li>The <strong>Concepts</strong> tab is the catch-all — magic systems, religions, laws, customs, species, currencies. Keyed like the others.</li>
@@ -1812,7 +1812,7 @@ Ly must not suspect Mara without finding evidence.</pre>
     <div class="pv-head">
       <span class="pv-title" id="pvTitle">Markdown output</span>
       <span id="totalTok" title="Estimated, not a real tokenizer count">~0 tokens</span>
-      <label class="toggle"><input type="checkbox" id="hideEmpty" checked> Hide empty sections</label>
+      <label class="toggle" title="Hide empty sections"><input type="checkbox" id="hideEmpty" checked> Hide empty</label>
       <div class="pv-actions">
         <button class="btn" id="btnCopy">Copy</button>
         <button class="btn" id="btnAll" hidden>Download lorebook .json</button>
@@ -6986,8 +6986,9 @@ button:focus-visible{
   flex-wrap:nowrap;
   overflow-x:auto;
   padding:12px 16px;
-  background:rgba(23,31,38,.96);
+  background:rgb(23,31,38);
   border-bottom:1px solid var(--line);
+  z-index:20;
 }
 
 .chip{
@@ -7178,10 +7179,11 @@ button:focus-visible{
 .ww-tools-row{
   display:flex;
   align-items:center;
-  justify-content:space-between;
   flex-wrap:wrap;
-  gap:10px;
+  gap:8px 14px;
 }
+.ww-tools-row .ww-target{margin-left:auto}
+.ww-progress-line[hidden]{display:none!important}
 .ww-view-switch{
   display:inline-flex;
   gap:3px;
@@ -7591,7 +7593,7 @@ html[data-theme="paper"] .lorebook-bar{background:rgba(93,74,45,.05)}
 html[data-theme="paper"] .lede{border-left-color:rgba(154,100,20,.6);color:var(--ink-dim)}
 html[data-theme="paper"] .lorebook-bar input{background:rgba(255,253,244,.85)}
 
-html[data-theme="paper"] .roster{background:rgba(233,222,196,.96)}
+html[data-theme="paper"] .roster{background:rgb(233,222,196)}
 html[data-theme="paper"] .chip{
   background:linear-gradient(150deg,#fffdf4,#f3ead3);
   border-color:#c9b98f;
@@ -7658,6 +7660,38 @@ html[data-theme="paper"] #toast{background:rgba(253,248,236,.98);border-color:#b
 html[data-theme="paper"] .wi-panel,
 html[data-theme="paper"] .wi-section{border-top-color:var(--line)}
 html[data-theme="paper"] .cluster-dialog{background:rgba(31,122,110,.06)}
+
+/* ---------- compact header on laptops and desktops ----------
+   Three slim rows (title, project and search / name and actions / tabs), so the
+   writing form and the output get most of the screen. Phones keep the layout below. */
+@media(min-width:901px){
+  header{padding:8px 18px;gap:8px 14px}
+  .brand{order:1;font-size:18px}
+  .brand::before{width:28px;height:28px;font-size:19px;border-radius:8px}
+  .projectbar{order:2;min-width:0}
+  #projectSelect{padding-top:5px;padding-bottom:5px}
+  .project-mini{width:28px;height:28px}
+  .entry-search-wrap{order:3;flex:1 1 340px;width:auto;min-width:280px}
+  .entry-search-bar{padding:0;border:0;background:transparent;gap:6px;flex-wrap:nowrap}
+  .entry-search-bar label{font-size:0;gap:0;padding:0 2px}
+  .entry-search-bar input,.entry-search-bar select,.entry-search-bar button{min-height:30px;padding:4px 10px}
+  .entry-search-bar input{min-width:120px}
+  .theme-toggle{order:4;position:static}
+  header::after{content:"";order:5;flex-basis:100%;height:0}
+  .namebar{order:6}
+  #charName{padding:6px 10px}
+  .toolbar{order:7}
+  .toolbar .btn{padding-top:6px;padding-bottom:6px}
+  .tabs{order:10;padding:3px;gap:3px}
+  .tab{padding:6px 11px}
+  .pv-head{padding:9px 18px;flex-wrap:nowrap}
+  #pvTitle{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pv-actions{flex:none}
+  .pv-actions .btn{padding:6px 10px}
+  .ww-preview-tools{padding:6px 18px}
+  .ww-tools-row{gap:6px 12px}
+  .ww-tools-row .toggle,.ww-view-btn,#totalTok{white-space:nowrap}
+}
 
 /* ---------- smaller screens ---------- */
 
@@ -8006,7 +8040,8 @@ html[data-theme="paper"] .cluster-dialog{background:rgba(31,122,110,.06)}
 
   const targetLabel = node("label", "ww-target");
   targetLabel.htmlFor = "ww-token-target";
-  targetLabel.append(node("span", "", "Token budget"));
+  targetLabel.append(node("span", "", "Budget"));
+  targetLabel.title = "Token budget";
 
   const targetInput = node("input");
   targetInput.id = "ww-token-target";
@@ -8027,7 +8062,7 @@ html[data-theme="paper"] .cluster-dialog{background:rgba(31,122,110,.06)}
   );
   help.id = "ww-target-help";
 
-  toolsRow.append(viewSwitch, targetLabel);
+  toolsRow.append(viewSwitch);
 
   const progressLine = node("div", "ww-progress-line");
   const progress = node("progress");
@@ -8039,6 +8074,11 @@ html[data-theme="paper"] .cluster-dialog{background:rgba(31,122,110,.06)}
   const progressCaption = node("span", "ww-progress-caption");
   progressLine.append(progress, progressCaption);
 
+  const totalTokBadge = document.getElementById("totalTok");
+  const hideEmptyToggle = document.getElementById("hideEmpty");
+  if(totalTokBadge) toolsRow.append(totalTokBadge);
+  if(hideEmptyToggle && hideEmptyToggle.closest("label")) toolsRow.append(hideEmptyToggle.closest("label"));
+  toolsRow.append(targetLabel);
   tools.append(toolsRow, progressLine, help);
   preview.insertBefore(tools, output);
 
@@ -8241,6 +8281,7 @@ html[data-theme="paper"] .cluster-dialog{background:rgba(31,122,110,.06)}
 
     if(target === null){
       progress.hidden = true;
+      progressLine.hidden = true;
       progressCaption.textContent = "~" + estimated + " tokens";
       tools.dataset.level = "normal";
       const badge = document.getElementById("totalTok");
@@ -8248,6 +8289,7 @@ html[data-theme="paper"] .cluster-dialog{background:rgba(31,122,110,.06)}
       return;
     }
     progress.hidden = false;
+    progressLine.hidden = false;
 
     const ratio = estimated / target;
     const level = ratio >= 1 ? "over" : ratio >= .85 ? "near" : "normal";

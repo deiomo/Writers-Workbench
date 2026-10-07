@@ -8,6 +8,8 @@
 - Unticking Main characters, Relationships or Scenario on the Live tab now removes those entries from the synced lorebook. Changing the active scenario removes the old one. Before, stale copies stayed active.
 
 ### Added
+- More room to write on laptops. The header is now three slim rows: title, project and search on top, then the name and buttons, then the tabs. The Markdown output panel puts its view switch, token count, "Hide empty" and budget on one slim row, and the budget bar only appears when a budget is set. On a 1536×700 screen the output text now starts at 232px instead of 422px. Phone layout is unchanged.
+- The bar holding the character cards at the top of the form is solid now, so text no longer shows through it while you scroll.
 - Live sync is turned on with a large **Start live sync** button instead of a small checkbox. While syncing it turns green with a pulsing dot and reads "LIVE · click to pause".
 - Live sync warns you before importing a lorebook that wasn't made by the Workbench. It names the entries, explains that they'll go into Concepts and be rewritten in SillyTavern wrapped in Concept XML tags with a "[Concept]" name, and suggests backing the lorebook up first. The Live tab says the same.
 
