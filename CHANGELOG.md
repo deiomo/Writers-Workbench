@@ -8,6 +8,7 @@
 - Unticking Main characters, Relationships or Scenario on the Live tab now removes those entries from the synced lorebook. Changing the active scenario removes the old one. Before, stale copies stayed active.
 
 ### Added
+- Live sync is turned on with a large **Start live sync** button instead of a small checkbox. While syncing it turns green with a pulsing dot and reads "LIVE · click to pause".
 - Live sync warns you before importing a lorebook that wasn't made by the Workbench. It names the entries, explains that they'll go into Concepts and be rewritten in SillyTavern wrapped in Concept XML tags with a "[Concept]" name, and suggests backing the lorebook up first. The Live tab says the same.
 
 ### Fixed: pasting a Workbench character back in

@@ -25,7 +25,7 @@ Extensions panel → Writer's Workbench Bridge should appear, and the wand menu 
 
 1. Wand menu → Writer's Workbench. It opens in a new tab, served by SillyTavern.
 2. In the Workbench, open the **Live** tab → pick a lorebook from the list, or choose
-   "New lorebook" and type a name → tick Live and confirm.
+   "New lorebook" and type a name → press Start live sync and confirm.
 3. In SillyTavern: World Info → activate that lorebook once (globally or on the character).
 4. Keep the SillyTavern tab open while you work.
 
@@ -48,7 +48,7 @@ SillyTavern's own editor to linked entries are overwritten by the next sync.
 - Side characters, locations, items, factions, history, and concepts always sync. The Live tab
   has its own checkboxes for the active scenario, main characters, and the relationship graph.
 - Switching to another project in the Workbench pauses Live, so one project is never pushed
-  into a book another project is syncing by accident. Tick Live again to sync the new one.
+  into a book another project is syncing by accident. Press Start live sync again to sync the new one.
   A duplicated project gets fresh ids, so the original and the copy can share a book.
 - With SillyTavern open in several tabs, only one tab's bridge answers the Workbench. If it
   closes, another tab takes over.
