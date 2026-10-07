@@ -382,7 +382,7 @@ function addUi() {
             <div class="inline-drawer-content">
                 <div id="wwb_status" class="wwb-status"><span class="wwb-dot"></span><span class="wwb-text">Starting</span></div>
                 <div class="menu_button" id="wwb_open">Open Writer's Workbench</div>
-                <small>Edits in the Workbench are written into the lorebook you name there. Only entries the Workbench made are changed; anything you wrote by hand in that book is left alone. Keep this SillyTavern tab open while you work.</small>
+                <small>Sync to edit lorebooks.</small>
                 <div id="wwb_log" class="wwb-log"></div>
             </div>`;
         host.appendChild(box);
